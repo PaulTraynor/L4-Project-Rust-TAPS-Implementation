@@ -20,3 +20,13 @@
 * *0.5 hour* Started new Rust project and created GitHub Repository 
 * *0.25 hour* Created dissertation repo and added space for minutes   
 * *0.5 hour* meeting with supervisor
+
+## Week 2
+
+###03 Oct 2021
+**0.5 hour* Starting working on requirements for the project and a plan 
+
+###04 Oct 2021
+**1 hour* Finished requirements analysis and plan, emailed to supervisor
+
+###05 Oct 2021

@@ -1,0 +1,2 @@
+30.09.2021 We discussed next steps for the project and agreed by next week to come up with a document of requirements and priorities for the project along with a plan. We also discussed my understanding of the IETF drafts and what scope the project should take.
+Colin advised to take a step back before starting work on the coding, which had been my first thought. I was also given a dissertation to read through of an MSc student who had done a similar project a few years ago.
