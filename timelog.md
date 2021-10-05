@@ -23,12 +23,15 @@
 
 ## Week 2
 
-###03 Oct 2021
+### 03 Oct 2021
+
 * *0.5 hour* Starting working on requirements for the project and a plan 
 
-###04 Oct 2021
+### 04 Oct 2021
+
 * *1 hour* Finished requirements analysis and plan, emailed to supervisor
 **1 hour* Started reading example dissertation
+ 
+### 05 Oct 2021
 
-###05 Oct 2021
 * *1 hour* Finished reading example dissertation
