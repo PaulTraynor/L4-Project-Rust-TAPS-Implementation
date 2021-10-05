@@ -28,5 +28,7 @@
 
 ###04 Oct 2021
 **1 hour* Finished requirements analysis and plan, emailed to supervisor
+**1 hour* Started reading example dissertation
 
 ###05 Oct 2021
+**1 hour* Finished reading example dissertation
