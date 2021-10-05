@@ -18,7 +18,7 @@
 
 * *2 hours* Read the draft-ietf-taps-impl-10 document 
 * *0.5 hour* Started new Rust project and created GitHub Repository 
-* *0.25 hour* Created dissertation repo and added space for minutes   
+* *0.5 hour* Created dissertation repo and added space for minutes   
 * *0.5 hour* meeting with supervisor
 
 ## Week 2
