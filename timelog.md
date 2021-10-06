@@ -35,3 +35,8 @@
 ### 05 Oct 2021
 
 * *1 hour* Finished reading example dissertation
+
+### 06 Oct 2021
+
+* *0.5 hour* Meeting with supervisor
+* *3 hours* Reading and experimenting with quiche (Rust QU|IC implementation)
