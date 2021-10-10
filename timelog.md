@@ -3,7 +3,7 @@
 * Implementing The Transport Services API in Rust
 * Paul Christopher Traynor
 * 2205382t
-* Colin Perkins
+* Supervisor: Colin Perkins
 
 ## Guidance
 
