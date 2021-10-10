@@ -40,3 +40,11 @@
 
 * *0.5 hour* Meeting with supervisor
 * *3 hours* Reading and experimenting with quiche (Rust QU|IC implementation)
+
+### 08 Oct 2021
+
+* *4 hours* Further experimentation with quiche
+
+### 10 Oct 2021
+
+* *3 hours* Writing up formal requirements document 
