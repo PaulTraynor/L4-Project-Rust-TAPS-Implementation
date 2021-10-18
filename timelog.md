@@ -48,3 +48,11 @@
 ### 10 Oct 2021
 
 * *3 hours* Writing up formal requirements document 
+
+### 11 Oct 2021
+
+* *1 hour* Finished writing up formal requirements document 
+
+### 18 Oct 2021
+
+* *3 hours* Writing requirements in MOSCOW format, making a diagram to show the API design and writing up a timeline for the project
