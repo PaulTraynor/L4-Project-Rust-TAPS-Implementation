@@ -49,9 +49,13 @@
 
 * *3 hours* Writing up formal requirements document 
 
+## Week 3
+
 ### 11 Oct 2021
 
 * *1 hour* Finished writing up formal requirements document 
+
+## Week 4
 
 ### 18 Oct 2021
 
