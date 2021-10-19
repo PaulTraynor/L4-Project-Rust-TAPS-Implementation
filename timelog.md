@@ -60,3 +60,7 @@
 ### 18 Oct 2021
 
 * *3 hours* Writing requirements in MOSCOW format, making a diagram to show the API design and writing up a timeline for the project
+
+### 19 Oct 2021
+
+* *1 hour* Finished timeline, emailed all three documents to supervisor
