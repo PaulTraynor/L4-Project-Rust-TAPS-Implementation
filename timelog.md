@@ -64,3 +64,7 @@
 ### 19 Oct 2021
 
 * *1 hour* Finished timeline, emailed all three documents to supervisor
+
+### 20 Oct 2021
+
+* *0.5 hour* Meeting with supervisor
