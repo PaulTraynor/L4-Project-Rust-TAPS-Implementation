@@ -7,7 +7,6 @@ pub struct RemoteEndpoint {
     ipv4: Option<Ipv4Addr>,
     ipv6: Option<Ipv6Addr>,
     port: Option<String>,
-    interface: Option<String>,
 }
 
 impl RemoteEndpoint {
@@ -18,7 +17,6 @@ impl RemoteEndpoint {
             ipv4: None,
             ipv6: None,
             port: None,
-            interface: None,
         }
     }
 
