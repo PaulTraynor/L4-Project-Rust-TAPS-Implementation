@@ -6,3 +6,17 @@ pub struct PreConnection {
     pub remote_endpoint: remote_endpoint::RemoteEndpoint,
 
 }
+
+impl PreConnection {
+    fn initiate(&self) -> &impl Connection {
+        //
+    }
+
+    //fn listen(&self) -> Listener {}
+} 
+
+pub trait Connection {
+    fn send();
+
+    fn recv();
+}
