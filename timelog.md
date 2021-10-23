@@ -68,3 +68,7 @@
 ### 20 Oct 2021
 
 * *0.5 hour* Meeting with supervisor
+
+### 22 Oct 2021
+
+* *2 hours* Began coding, started implementation of basic structs and traits
