@@ -8,8 +8,9 @@ pub struct PreConnection {
 }
 
 impl PreConnection {
-    fn initiate(&self) -> &impl Connection {
-        //
+    fn initiate(&self) //-> &impl Connection 
+    {
+        
     }
 
     //fn listen(&self) -> Listener {}
@@ -19,4 +20,8 @@ pub trait Connection {
     fn send();
 
     fn recv();
+
+    fn close();
+
+    fn abort();
 }
