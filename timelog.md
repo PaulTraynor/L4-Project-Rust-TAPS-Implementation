@@ -72,3 +72,13 @@
 ### 22 Oct 2021
 
 * *2 hours* Began coding, started implementation of basic structs and traits
+
+### 24 Oct 2021 
+
+* *2 hours* Began implementation of transport properties
+
+## Week 5
+
+### 25 Oct 2021 
+
+* *1 hour* Began implementation of security properties and Messages
