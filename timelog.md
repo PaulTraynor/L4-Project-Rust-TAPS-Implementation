@@ -82,3 +82,11 @@
 ### 25 Oct 2021 
 
 * *1 hour* Began implementation of security properties and Messages
+
+### 26 Oct 2021
+
+* *2 hours* Wrote up API design specification
+
+### 27 Oct 2021
+
+* *0.5 hour* Meeting with supervisor
