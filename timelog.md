@@ -90,3 +90,7 @@
 ### 27 Oct 2021
 
 * *0.5 hour* Meeting with supervisor
+
+### 28 Oct 2021
+
+* *1 hour* Implementing and testing dns code
