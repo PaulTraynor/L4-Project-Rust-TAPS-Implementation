@@ -28,9 +28,10 @@ pub trait Connection {
     fn abort();
 }
 
-pub fn get_ips(hostname: &str) {
-    let ips: Vec<std::net::IpAddr> = lookup_host(hostname).unwrap();
-    for ip in ips {
-        println!("{}", ip);
-    }
+pub fn get_ips(hostname: &str) -> Vec<std::net::IpAddr> {
+    //let ips: Vec<std::net::IpAddr> = 
+    lookup_host(hostname).unwrap()
+    //for ip in ips {
+      //  println!("{}", ip);
+    //}
 }
