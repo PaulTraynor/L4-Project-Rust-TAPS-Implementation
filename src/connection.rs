@@ -1,13 +1,14 @@
 use crate::message::Message;
 use std::net::TcpStream;
-use std::net::SocketAddr;
+use std::net::Shutdown;
+use std::io::prelude::*;
 
 pub trait ProtocolConnection {
-    fn send(&self, message: &Message);
+    fn send(&mut self, buffer: &[u8]);
 
-    //fn recv();
+    fn recv(&mut self);
 
-    //fn close();
+    fn close(&self);
 
     //fn abort();
 }
@@ -17,8 +18,16 @@ pub struct Connection {
 }
 
 impl Connection{
-    pub fn send(&self, message: &Message) {
-        self.protocol_impl.send(message);
+    pub fn send(&mut self, buffer: &[u8]) {
+        self.protocol_impl.send(buffer);
+    }
+
+    fn recv(&mut self) {
+        self.protocol_impl.recv();
+    }
+
+    fn close(&self) {
+        self.protocol_impl.close();
     }
 }
 
@@ -27,8 +36,17 @@ pub struct TcpConnection {
 }
 
 impl ProtocolConnection for TcpConnection {
-    fn send(&self, message: &Message) {
-        println!("hello");
+    fn send(&mut self, buffer: &[u8]) {
+        self.stream.write(buffer).unwrap();
+    }
+
+    fn recv(&mut self) {
+        let mut buffer: [u8; 1000] = [0; 1000];
+        self.stream.read(&mut buffer).unwrap();
+    }
+
+    fn close(&self) {
+        self.stream.shutdown(Shutdown::Both).expect("failed to shutdown");
     }
 }
 
