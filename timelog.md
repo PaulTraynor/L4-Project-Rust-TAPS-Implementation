@@ -99,3 +99,7 @@
 ### 29 Oct 2021
 
 * *1 hour* Further reading of OOP features in Rust
+
+### 30 Oct 2021
+
+* *4 hours* Changing Connection to struct, modifying Preconnection to return Connection and adding TCP code for send, receive and close actions
