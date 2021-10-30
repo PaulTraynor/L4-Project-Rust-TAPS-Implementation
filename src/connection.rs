@@ -1,4 +1,6 @@
 use crate::message::Message;
+use std::net::TcpStream;
+use std::net::SocketAddr;
 
 pub trait ProtocolConnection {
     fn send(&self, message: &Message);
@@ -10,18 +12,18 @@ pub trait ProtocolConnection {
     //fn abort();
 }
 
-pub struct Connection<T: ProtocolConnection> {
-    pub protocol_impl: T,
+pub struct Connection {
+    pub protocol_impl: Box<dyn ProtocolConnection>,
 }
 
-impl<T> Connection<T> where T: ProtocolConnection {
+impl Connection{
     pub fn send(&self, message: &Message) {
         self.protocol_impl.send(message);
     }
 }
 
 pub struct TcpConnection {
-    
+    pub stream: TcpStream,
 }
 
 impl ProtocolConnection for TcpConnection {
@@ -29,3 +31,4 @@ impl ProtocolConnection for TcpConnection {
         println!("hello");
     }
 }
+

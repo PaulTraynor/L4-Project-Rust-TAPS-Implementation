@@ -4,9 +4,9 @@ use std::net::Ipv6Addr;
 pub struct RemoteEndpoint {
     pub hostname: Option<String>,
     service: Option<String>,
-    ipv4: Option<Ipv4Addr>,
+    pub ipv4: Option<Ipv4Addr>,
     ipv6: Option<Ipv6Addr>,
-    port: Option<String>,
+    pub port: Option<u16>,
 }
 
 impl RemoteEndpoint {
