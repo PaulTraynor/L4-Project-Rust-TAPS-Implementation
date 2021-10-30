@@ -95,3 +95,7 @@
 
 * *1 hour* Implementing and testing dns code
 * *2 hours* Reading up on concurrency and OOP features in Rust
+
+### 29 Oct 2021
+
+* *1 hour* Further reading of OOP features in Rust
