@@ -1,5 +1,6 @@
 use crate::local_endpoint;
 use crate::remote_endpoint;
+use crate::message::Message;
 use std::net;
 use dns_lookup::{lookup_host};
 
@@ -17,16 +18,6 @@ impl PreConnection {
 
     //fn listen(&self) -> Listener {}
 } 
-
-pub trait Connection {
-    fn send();
-
-    fn recv();
-
-    fn close();
-
-    fn abort();
-}
 
 pub fn get_ips(hostname: &str) -> Vec<std::net::IpAddr> {
     //let ips: Vec<std::net::IpAddr> = 

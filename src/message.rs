@@ -1,3 +1,3 @@
-struct Message {
-    content: [u8];
+pub struct Message<'a> {
+    pub content: &'a [u8],
 }
