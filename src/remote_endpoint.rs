@@ -4,6 +4,6 @@ use std::net::Ipv6Addr;
 pub enum RemoteEndpoint {
     HostnamePort(String, u16),
     Ipv4Port(Ipv4Addr, u16),
-    Ipv6Port(Ipv4Port, u16),
+    Ipv6Port(Ipv6Addr, u16),
 }
 

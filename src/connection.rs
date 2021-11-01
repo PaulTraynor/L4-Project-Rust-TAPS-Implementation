@@ -1,9 +1,12 @@
 use crate::message::Message;
+use crate::remote_endpoint::RemoteEndpoint;
 use std::net::TcpStream;
 use std::net::Shutdown;
+use std::net::SocketAddr;
 use std::io::prelude::*;
 
 pub trait ProtocolConnection {
+
     fn send(&mut self, buffer: &[u8]);
 
     fn recv(&mut self);
@@ -11,6 +14,7 @@ pub trait ProtocolConnection {
     fn close(&self);
 
     //fn abort();
+
 }
 
 pub struct Connection {
@@ -18,6 +22,7 @@ pub struct Connection {
 }
 
 impl Connection{
+
     pub fn send(&mut self, buffer: &[u8]) {
         self.protocol_impl.send(buffer);
     }
@@ -31,11 +36,20 @@ impl Connection{
     }
 }
 
-pub struct TcpConnection {
+pub struct TcpConnection {  
     pub stream: TcpStream,
 }
 
+impl TcpConnection {
+    fn new(addr:SocketAddr) -> TcpConnection {
+        if let Ok(stream) = TcpStream::connect(addr) {
+            TcpConnection {stream}
+        }
+    }
+}
+
 impl ProtocolConnection for TcpConnection {
+
     fn send(&mut self, buffer: &[u8]) {
         self.stream.write(buffer).unwrap();
     }

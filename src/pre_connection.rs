@@ -15,7 +15,7 @@ impl PreConnection {
     fn initiate(&self) -> Connection {
         // candidate gathering...
         // candidate racing...
-        let stream = TcpStream::connect((self.remote_endpoint.ipv4.unwrap(), self.remote_endpoint.port.unwrap())).unwrap();
+        let stream = TcpStream::connect("127.0.0.1:8080").unwrap();
         
         let tcp_connection = Box::new (TcpConnection {stream: stream}) ;
         Connection {protocol_impl: tcp_connection}
