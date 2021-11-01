@@ -4,6 +4,7 @@ use std::net::TcpStream;
 use std::net::Shutdown;
 use std::net::SocketAddr;
 use std::io::prelude::*;
+use std::net::TcpListener;
 
 pub trait ProtocolConnection {
 
@@ -41,11 +42,22 @@ pub struct TcpConnection {
 }
 
 impl TcpConnection {
-    fn new(addr:SocketAddr) -> TcpConnection {
-        if let Ok(stream) = TcpStream::connect(addr) {
-            TcpConnection {stream}
-        }
+
+    fn connect(addr:SocketAddr) -> TcpConnection {
+        let tcp_stream = TcpStream::connect(addr).unwrap();
+        TcpConnection {stream: tcp_stream}
     }
+
+    fn listener(addr:SocketAddr) -> TcpListener {
+        TcpListener::bind(addr).unwrap()
+    }
+
+    fn accept_connection(listener: TcpListener) ->  TcpConnection{
+            let (tcp_stream, addr) = listener.accept().unwrap(); 
+            TcpConnection {stream: tcp_stream}
+    }
+
+
 }
 
 impl ProtocolConnection for TcpConnection {
