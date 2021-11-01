@@ -103,3 +103,10 @@
 ### 30 Oct 2021
 
 * *4 hours* Changing Connection to struct, modifying Preconnection to return Connection and adding TCP code for send, receive and close actions
+
+## Week 6
+
+### 01 Nov 2021
+
+* *0.5 hour* Improving existing API design specification
+* *1 hour* Adding rest of tcp-specific code
