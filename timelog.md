@@ -110,3 +110,7 @@
 
 * *0.5 hour* Improving existing API design specification
 * *1 hour* Adding rest of tcp-specific code
+
+### 02 Nov 2021
+
+* *3 hours* Experimenting with different designs and implementations for messages, message parsing and framers
