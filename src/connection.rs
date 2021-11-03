@@ -1,4 +1,3 @@
-use crate::message::Message;
 use crate::remote_endpoint::RemoteEndpoint;
 use std::net::TcpStream;
 use std::net::Shutdown;

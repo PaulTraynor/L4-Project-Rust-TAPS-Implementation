@@ -1,6 +1,5 @@
 use crate::local_endpoint;
 use crate::remote_endpoint;
-use crate::message::Message;
 use std::net::TcpStream;
 use dns_lookup::{lookup_host};
 use crate::connection::*;
