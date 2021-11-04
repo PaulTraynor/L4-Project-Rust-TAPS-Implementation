@@ -114,3 +114,9 @@
 ### 02 Nov 2021
 
 * *3 hours* Experimenting with different designs and implementations for messages, message parsing and framers
+
+### 03 Nov 2021
+
+* *0.5 hours* Meeting with supervisor
+* *1 hour* Adding Framer trait and coding an implementation as an example
+* *0.5 hours* Researching async/await in Rust
