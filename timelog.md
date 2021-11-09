@@ -128,7 +128,7 @@
 ### 06 Nov 2021
 
 * *1 hour* Researching Tokio
-* *0.5 hour* Trying and modifying examples of asynchronous networking code in Python
+* *0.5 hours* Trying and modifying examples of asynchronous networking code in Python
 
 ## Week 7
 
