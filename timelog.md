@@ -120,3 +120,23 @@
 * *0.5 hours* Meeting with supervisor
 * *1 hour* Adding Framer trait and coding an implementation as an example
 * *0.5 hours* Researching async/await in Rust
+
+### 05 Nov 2021
+
+* *2 hours* Researching Nom
+
+### 06 Nov 2021
+
+* *1 hour* Researching Tokio
+* 0.5 hour* Trying and modifying examples of asynchronous networking code in Python
+
+## Week 7
+
+### 08 Nov 2021
+
+* *2 hours* Researching Tokio
+
+### 09 Nov 2021
+
+* *2 hours* Examining Quiche code examples and figuring out they worked
+* *3 hours* Researching  and experimenting with Tokio
