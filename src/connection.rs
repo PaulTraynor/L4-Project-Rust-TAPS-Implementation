@@ -7,12 +7,14 @@ use std::net::SocketAddr;
 use std::net::TcpListener;
 use std::net::TcpStream;
 
+const HTTP_REQ_STREAM_ID: u64 = 4;
+
 pub trait ProtocolConnection {
     fn send(&mut self, buffer: &[u8]);
 
     fn recv(&mut self);
 
-    fn close(&self);
+    fn close(&mut self);
 
     //fn abort();
 }
@@ -30,7 +32,7 @@ impl Connection {
         self.protocol_impl.recv();
     }
 
-    fn close(&self) {
+    fn close(&mut self) {
         self.protocol_impl.close();
     }
 }
@@ -61,11 +63,11 @@ impl ProtocolConnection for TcpConnection {
     }
 
     fn recv(&mut self) {
-        let mut buffer: [u8; 1000] = [0; 1000];
+        let mut buffer: [u8; 1024] = [0; 1024];
         self.stream.read(&mut buffer).unwrap();
     }
 
-    fn close(&self) {
+    fn close(&mut self) {
         self.stream
             .shutdown(Shutdown::Both)
             .expect("failed to shutdown");
@@ -73,7 +75,7 @@ impl ProtocolConnection for TcpConnection {
 }
 
 pub struct QuicConnection {
-    pub conn: quiche::Connection,
+    pub conn: std::pin::Pin<Box<quiche::Connection>>,
 }
 
 impl QuicConnection {
@@ -245,8 +247,22 @@ impl QuicConnection {
     }
 }
 
-/*
 impl ProtocolConnection for QuicConnection {
+    fn send(&mut self, buffer: &[u8]) {
+        self.conn
+            .stream_send(HTTP_REQ_STREAM_ID, buffer, false) // TODO, is fin always false?
+            .unwrap();
+    }
 
+    fn recv(&mut self) {
+        let mut buffer: [u8; 1024] = [0; 1024];
+        self.conn
+            .stream_recv(HTTP_REQ_STREAM_ID, &mut buffer)
+            .unwrap();
+    }
+
+    fn close(&mut self) {
+        let reason = "connection closed by application";
+        self.conn.close(false, 0, &reason.as_bytes()).unwrap();
+    }
 }
-*/
