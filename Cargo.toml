@@ -7,3 +7,7 @@ edition = "2018"
 
 [dependencies]
 dns-lookup = "1.0.8"
+quiche = "0.10.0"
+log = { version = "0.4", features = ["std"] }
+ring = "0.16"
+mio = "0.6"
