@@ -46,15 +46,6 @@ impl TcpConnection {
         let tcp_stream = TcpStream::connect(addr).unwrap();
         TcpConnection { stream: tcp_stream }
     }
-
-    fn listener(addr: SocketAddr) -> TcpListener {
-        TcpListener::bind(addr).unwrap()
-    }
-
-    fn accept_connection(listener: TcpListener) -> TcpConnection {
-        let (tcp_stream, addr) = listener.accept().unwrap();
-        TcpConnection { stream: tcp_stream }
-    }
 }
 
 impl ProtocolConnection for TcpConnection {
