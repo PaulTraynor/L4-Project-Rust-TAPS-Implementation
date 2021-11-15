@@ -140,3 +140,18 @@
 
 * *2 hours* Examining Quiche code examples and figuring out they worked
 * *3 hours* Researching  and experimenting with Tokio
+
+### 10 Nov 2021
+
+* *4 hours* Added code to create QUIC connections, and send and receive data using QUIC
+
+### 12 Nov 2021
+
+* *4 hours* Coded TCP and QUIC listeners and related methods 
+
+## Week 8
+
+### 15 Nov 2021
+
+* *3 hours* Started an example HTTP parser using nom
+
