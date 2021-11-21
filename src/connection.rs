@@ -821,3 +821,164 @@ impl ProtocolConnection for TlsTcpClientConnection {
         self.socket.shutdown(std::net::Shutdown::Both);
     }
 }
+
+pub struct TlsTcpServerConnection {
+    socket: mio_tls::net::TcpStream,
+    token: mio_tls::Token,
+    closing: bool,
+    closed: bool,
+    //mode: ServerMode,
+    tls_conn: rustls::ServerConnection,
+    //back: Option<TcpStream>,
+    sent_http_response: bool,
+}
+
+impl TlsTcpServerConnection {
+    fn new(
+        socket: mio_tls::net::TcpStream,
+        token: mio_tls::Token,
+        //mode: ServerMode,
+        tls_conn: rustls::ServerConnection,
+    ) -> TlsTcpServerConnection {
+        //let back = open_back(&mode);
+        TlsTcpServerConnection {
+            socket,
+            token,
+            closing: false,
+            closed: false,
+            //mode,
+            tls_conn,
+            //back,
+            sent_http_response: false,
+        }
+    }
+
+    /// We're a connection, and we have something to do.
+    fn ready(&mut self, registry: &mio_tls::Registry, ev: &mio_tls::event::Event) {
+        // If we're readable: read some TLS.  Then
+        // see if that yielded new plaintext.  Then
+        // see if the backend is readable too.
+        if ev.is_readable() {
+            self.do_tls_read();
+            self.try_plain_read();
+            //self.try_back_read();
+        }
+
+        if ev.is_writable() {
+            self.do_tls_write_and_handle_error();
+        }
+
+        if self.closing {
+            let _ = self.socket.shutdown(std::net::Shutdown::Both);
+            //self.close_back();
+            self.closed = true;
+            self.deregister_server(registry);
+        } else {
+            self.reregister_server(registry);
+        }
+    }
+
+    fn do_tls_write_and_handle_error(&mut self) {
+        let rc = self.tls_write();
+        if rc.is_err() {
+            println!("write failed {:?}", rc);
+            self.closing = true;
+            return;
+        }
+    }
+
+    fn tls_write(&mut self) -> io::Result<usize> {
+        self.tls_conn.write_tls(&mut self.socket)
+    }
+
+    fn do_tls_read(&mut self) {
+        // Read some TLS data.
+        match self.tls_conn.read_tls(&mut self.socket) {
+            Err(err) => {
+                if let io::ErrorKind::WouldBlock = err.kind() {
+                    return;
+                }
+
+                println!("read error {:?}", err);
+                self.closing = true;
+                return;
+            }
+            Ok(0) => {
+                println!("eof");
+                self.closing = true;
+                return;
+            }
+            Ok(_) => {}
+        };
+
+        // Process newly-received TLS messages.
+        if let Err(err) = self.tls_conn.process_new_packets() {
+            println!("cannot process packet: {:?}", err);
+
+            // last gasp write to send any alerts
+            self.do_tls_write_and_handle_error();
+
+            self.closing = true;
+        }
+    }
+
+    fn try_plain_read(&mut self) {
+        // Read and process all available plaintext.
+        if let Ok(io_state) = self.tls_conn.process_new_packets() {
+            if io_state.plaintext_bytes_to_read() > 0 {
+                let mut buf = Vec::new();
+                buf.resize(io_state.plaintext_bytes_to_read(), 0u8);
+
+                self.tls_conn.reader().read(&mut buf).unwrap();
+
+                println!("plaintext read {:?}", buf.len());
+                //self.incoming_plaintext(&buf);
+            }
+        }
+    }
+
+    fn reregister_server(&mut self, registry: &mio_tls::Registry) {
+        let event_set = self.event_set();
+        registry
+            .reregister(&mut self.socket, self.token, event_set)
+            .unwrap();
+    }
+
+    fn deregister_server(&mut self, registry: &mio_tls::Registry) {
+        registry.deregister(&mut self.socket).unwrap();
+    }
+
+    /// What IO events we're currently waiting for,
+    /// based on wants_read/wants_write.
+    fn event_set(&self) -> mio_tls::Interest {
+        let rd = self.tls_conn.wants_read();
+        let wr = self.tls_conn.wants_write();
+
+        if rd && wr {
+            mio_tls::Interest::READABLE | mio_tls::Interest::WRITABLE
+        } else if wr {
+            mio_tls::Interest::WRITABLE
+        } else {
+            mio_tls::Interest::READABLE
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.closed
+    }
+}
+
+impl ProtocolConnection for TlsTcpServerConnection {
+    fn send(&mut self, buf: &[u8]) {
+        self.tls_conn.writer().write_all(buf);
+    }
+
+    fn recv(&mut self) {
+        self.do_tls_read();
+        self.try_plain_read();
+    }
+
+    fn close(&mut self) {
+        self.socket.shutdown(std::net::Shutdown::Both);
+    }
+}
