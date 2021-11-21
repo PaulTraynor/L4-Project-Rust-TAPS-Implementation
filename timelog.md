@@ -155,3 +155,11 @@
 
 * *3 hours* Started an example HTTP parser using nom
 
+### 20 Nov 2021
+
+* *3 hours* Started implementing TLS over TCP code using rustls
+
+### 21 Nov 2021
+
+* *4 hours* Finished implementation of Connections using rustls
+
