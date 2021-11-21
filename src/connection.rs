@@ -337,28 +337,6 @@ impl TlsTcpClientConnection {
         TlsTcpClientConnection::new(sock, server_name, config)
     }
 
-    /// Handles events sent to the TlsClient by mio::Poll
-    fn ready(&mut self, ev: &mio_tls::event::Event) -> Option<Vec<u8>> {
-        assert_eq!(ev.token(), CLIENT);
-
-        if ev.is_readable() {
-            match self.do_read() {
-                Some(v) => return Some(v),
-                None => return None,
-            }
-        }
-
-        if ev.is_writable() {
-            self.do_write();
-        }
-
-        if self.is_closed() {
-            println!("Connection closed");
-            process::exit(if self.clean_closure { 0 } else { 1 });
-        }
-        None
-    }
-
     fn read_source_to_end(&mut self, rd: &mut dyn io::Read) -> io::Result<usize> {
         let mut buf = Vec::new();
         let len = rd.read_to_end(&mut buf)?;
@@ -428,37 +406,6 @@ impl TlsTcpClientConnection {
 
     fn do_write(&mut self) {
         self.tls_conn.write_tls(&mut self.socket).unwrap();
-    }
-
-    /// Registers self as a 'listener' in mio::Registry
-    fn register(&mut self, registry: &mio_tls::Registry) {
-        let interest = self.event_set();
-        registry
-            .register(&mut self.socket, CLIENT, interest)
-            .unwrap();
-    }
-
-    /// Reregisters self as a 'listener' in mio::Registry.
-    fn reregister(&mut self, registry: &mio_tls::Registry) {
-        let interest = self.event_set();
-        registry
-            .reregister(&mut self.socket, CLIENT, interest)
-            .unwrap();
-    }
-
-    /// Use wants_read/wants_write to register for different mio-level
-    /// IO readiness events.
-    fn event_set(&self) -> mio_tls::Interest {
-        let rd = self.tls_conn.wants_read();
-        let wr = self.tls_conn.wants_write();
-
-        if rd && wr {
-            mio_tls::Interest::READABLE | mio_tls::Interest::WRITABLE
-        } else if wr {
-            mio_tls::Interest::WRITABLE
-        } else {
-            mio_tls::Interest::READABLE
-        }
     }
 
     fn is_closed(&self) -> bool {
@@ -796,25 +743,7 @@ impl ProtocolConnection for TlsTcpClientConnection {
     }
 
     fn recv(&mut self) {
-        let mut bytes: Vec<u8> = Vec::new();
-        let mut poll = mio_tls::Poll::new().unwrap();
-        let mut events = mio_tls::Events::with_capacity(32);
-        self.register(poll.registry());
-
-        loop {
-            poll.poll(&mut events, None).unwrap();
-            if events.iter().peekable().peek().is_none() {
-                break;
-            }
-
-            for ev in events.iter() {
-                match self.ready(&ev) {
-                    Some(v) => bytes.extend(v),
-                    None => (),
-                }
-                self.reregister(poll.registry());
-            }
-        }
+        self.do_read();
     }
 
     fn close(&mut self) {
@@ -824,7 +753,7 @@ impl ProtocolConnection for TlsTcpClientConnection {
 
 pub struct TlsTcpServerConnection {
     socket: mio_tls::net::TcpStream,
-    token: mio_tls::Token,
+    //token: mio_tls::Token,
     closing: bool,
     closed: bool,
     //mode: ServerMode,
@@ -836,45 +765,20 @@ pub struct TlsTcpServerConnection {
 impl TlsTcpServerConnection {
     fn new(
         socket: mio_tls::net::TcpStream,
-        token: mio_tls::Token,
+        //token: mio_tls::Token,
         //mode: ServerMode,
         tls_conn: rustls::ServerConnection,
     ) -> TlsTcpServerConnection {
         //let back = open_back(&mode);
         TlsTcpServerConnection {
             socket,
-            token,
+            //token,
             closing: false,
             closed: false,
             //mode,
             tls_conn,
             //back,
             sent_http_response: false,
-        }
-    }
-
-    /// We're a connection, and we have something to do.
-    fn ready(&mut self, registry: &mio_tls::Registry, ev: &mio_tls::event::Event) {
-        // If we're readable: read some TLS.  Then
-        // see if that yielded new plaintext.  Then
-        // see if the backend is readable too.
-        if ev.is_readable() {
-            self.do_tls_read();
-            self.try_plain_read();
-            //self.try_back_read();
-        }
-
-        if ev.is_writable() {
-            self.do_tls_write_and_handle_error();
-        }
-
-        if self.closing {
-            let _ = self.socket.shutdown(std::net::Shutdown::Both);
-            //self.close_back();
-            self.closed = true;
-            self.deregister_server(registry);
-        } else {
-            self.reregister_server(registry);
         }
     }
 
@@ -934,32 +838,6 @@ impl TlsTcpServerConnection {
                 println!("plaintext read {:?}", buf.len());
                 //self.incoming_plaintext(&buf);
             }
-        }
-    }
-
-    fn reregister_server(&mut self, registry: &mio_tls::Registry) {
-        let event_set = self.event_set();
-        registry
-            .reregister(&mut self.socket, self.token, event_set)
-            .unwrap();
-    }
-
-    fn deregister_server(&mut self, registry: &mio_tls::Registry) {
-        registry.deregister(&mut self.socket).unwrap();
-    }
-
-    /// What IO events we're currently waiting for,
-    /// based on wants_read/wants_write.
-    fn event_set(&self) -> mio_tls::Interest {
-        let rd = self.tls_conn.wants_read();
-        let wr = self.tls_conn.wants_write();
-
-        if rd && wr {
-            mio_tls::Interest::READABLE | mio_tls::Interest::WRITABLE
-        } else if wr {
-            mio_tls::Interest::WRITABLE
-        } else {
-            mio_tls::Interest::READABLE
         }
     }
 
