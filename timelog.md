@@ -163,3 +163,9 @@
 
 * *4 hours* Finished implementation of Connections using rustls
 
+## Week 9
+
+### 23 Nov 2021
+
+* *4 hours* Coding TLS over TCP listener 
+
