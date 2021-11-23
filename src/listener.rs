@@ -1,10 +1,19 @@
 use crate::connection::*;
 use log::*;
-use mio;
+use mio_quic;
+use mio_tls;
 use quiche;
 use ring::rand::*;
+use rustls::server::{
+    AllowAnyAnonymousOrAuthenticatedClient, AllowAnyAuthenticatedClient, NoClientAuth,
+};
+use rustls::{self, RootCertStore};
 use std::collections::HashMap;
+use std::fs;
+use std::io;
+use std::io::{BufReader, Read, Write};
 use std::net::*;
+use std::sync::Arc;
 
 pub struct Listener {
     //listner - something implementing Stream trait
@@ -48,28 +57,28 @@ type ClientMap = HashMap<quiche::ConnectionId<'static>, Client>;
 pub struct QuicListener {
     client_map: ClientMap,
     client_id_vec: Vec<quiche::ConnectionId<'static>>,
-    poll: mio::Poll,
-    events: mio::Events,
+    poll: mio_quic::Poll,
+    events: mio_quic::Events,
     config: quiche::Config,
     conn_id_seed: ring::hmac::Key,
-    socket: mio::net::UdpSocket,
+    socket: mio_quic::net::UdpSocket,
 }
 
 impl QuicListener {
     pub fn listener(addr: SocketAddr) -> QuicListener {
         // Setup the event loop.
-        let poll = mio::Poll::new().unwrap();
-        let mut events = mio::Events::with_capacity(1024);
+        let poll = mio_quic::Poll::new().unwrap();
+        let mut events = mio_quic::Events::with_capacity(1024);
 
         // Create the UDP listening socket, and register it with the event loop.
         let socket = UdpSocket::bind(addr).unwrap();
 
-        let socket = mio::net::UdpSocket::from_socket(socket).unwrap();
+        let socket = mio_quic::net::UdpSocket::from_socket(socket).unwrap();
         poll.register(
             &socket,
-            mio::Token(0),
-            mio::Ready::readable(),
-            mio::PollOpt::edge(),
+            mio_quic::Token(0),
+            mio_quic::Ready::readable(),
+            mio_quic::PollOpt::edge(),
         )
         .unwrap();
 
@@ -77,9 +86,11 @@ impl QuicListener {
         let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
 
         config
-            .load_cert_chain_from_pem_file("src/cert.crt")
+            .load_cert_chain_from_pem_file("sec/cert.crt")
             .unwrap();
-        config.load_priv_key_from_pem_file("src/cert.key").unwrap();
+        config
+            .load_priv_key_from_pem_file("src/sec/cert.key")
+            .unwrap();
 
         config
             .set_application_protos(b"\x0ahq-interop\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
@@ -311,4 +322,244 @@ fn validate_token<'a>(
     }
 
     Some(quiche::ConnectionId::from_ref(&token[addr.len()..]))
+}
+
+fn find_suite(name: &str) -> Option<rustls::SupportedCipherSuite> {
+    for suite in rustls::ALL_CIPHER_SUITES {
+        let sname = format!("{:?}", suite.suite()).to_lowercase();
+
+        if sname == name.to_string().to_lowercase() {
+            return Some(*suite);
+        }
+    }
+
+    None
+}
+
+fn lookup_suites(suites: &[String]) -> Vec<rustls::SupportedCipherSuite> {
+    let mut out = Vec::new();
+
+    for csname in suites {
+        let scs = find_suite(csname);
+        match scs {
+            Some(s) => out.push(s),
+            None => panic!("cannot look up ciphersuite '{}'", csname),
+        }
+    }
+
+    out
+}
+
+/// Make a vector of protocol versions named in `versions`
+fn lookup_versions(versions: &[String]) -> Vec<&'static rustls::SupportedProtocolVersion> {
+    let mut out = Vec::new();
+
+    for vname in versions {
+        let version = match vname.as_ref() {
+            "1.2" => &rustls::version::TLS12,
+            "1.3" => &rustls::version::TLS13,
+            _ => panic!(
+                "cannot look up version '{}', valid are '1.2' and '1.3'",
+                vname
+            ),
+        };
+        out.push(version);
+    }
+
+    out
+}
+
+fn load_certs(filename: &str) -> Vec<rustls::Certificate> {
+    let certfile = fs::File::open(filename).expect("cannot open certificate file");
+    let mut reader = BufReader::new(certfile);
+    rustls_pemfile::certs(&mut reader)
+        .unwrap()
+        .iter()
+        .map(|v| rustls::Certificate(v.clone()))
+        .collect()
+}
+
+fn load_private_key(filename: &str) -> rustls::PrivateKey {
+    let keyfile = fs::File::open(filename).expect("cannot open private key file");
+    let mut reader = BufReader::new(keyfile);
+
+    loop {
+        match rustls_pemfile::read_one(&mut reader).expect("cannot parse private key .pem file") {
+            Some(rustls_pemfile::Item::RSAKey(key)) => return rustls::PrivateKey(key),
+            Some(rustls_pemfile::Item::PKCS8Key(key)) => return rustls::PrivateKey(key),
+            None => break,
+            _ => {}
+        }
+    }
+
+    panic!(
+        "no keys found in {:?} (encrypted keys not supported)",
+        filename
+    );
+}
+
+fn load_ocsp(filename: &Option<String>) -> Vec<u8> {
+    let mut ret = Vec::new();
+
+    if let &Some(ref name) = filename {
+        fs::File::open(name)
+            .expect("cannot open ocsp file")
+            .read_to_end(&mut ret)
+            .unwrap();
+    }
+
+    ret
+}
+
+fn make_config(args: &Args) -> Arc<rustls::ServerConfig> {
+    let client_auth = if args.flag_auth.is_some() {
+        let roots = load_certs(args.flag_auth.as_ref().unwrap());
+        let mut client_auth_roots = RootCertStore::empty();
+        for root in roots {
+            client_auth_roots.add(&root).unwrap();
+        }
+        if args.flag_require_auth {
+            AllowAnyAuthenticatedClient::new(client_auth_roots)
+        } else {
+            AllowAnyAnonymousOrAuthenticatedClient::new(client_auth_roots)
+        }
+    } else {
+        NoClientAuth::new()
+    };
+
+    let suites = if !args.flag_suite.is_empty() {
+        lookup_suites(&args.flag_suite)
+    } else {
+        rustls::ALL_CIPHER_SUITES.to_vec()
+    };
+
+    let versions = if !args.flag_protover.is_empty() {
+        lookup_versions(&args.flag_protover)
+    } else {
+        rustls::ALL_VERSIONS.to_vec()
+    };
+
+    let certs = load_certs(args.flag_certs.as_ref().expect("--certs option missing"));
+    let privkey = load_private_key(args.flag_key.as_ref().expect("--key option missing"));
+    let ocsp = load_ocsp(&args.flag_ocsp);
+
+    let mut config = rustls::ServerConfig::builder()
+        .with_cipher_suites(&suites)
+        .with_safe_default_kx_groups()
+        .with_protocol_versions(&versions)
+        .expect("inconsistent cipher-suites/versions specified")
+        .with_client_cert_verifier(client_auth)
+        .with_single_cert_with_ocsp_and_sct(certs, privkey, ocsp, vec![])
+        .expect("bad certificates/private key");
+
+    config.key_log = Arc::new(rustls::KeyLogFile::new());
+
+    if args.flag_resumption {
+        config.session_storage = rustls::server::ServerSessionMemoryCache::new(256);
+    }
+
+    if args.flag_tickets {
+        config.ticketer = rustls::Ticketer::new().unwrap();
+    }
+
+    config.alpn_protocols = args
+        .flag_proto
+        .iter()
+        .map(|proto| proto.as_bytes().to_vec())
+        .collect::<Vec<_>>();
+
+    Arc::new(config)
+}
+
+struct Args {
+    flag_port: Option<u16>,
+    flag_verbose: bool,
+    flag_protover: Vec<String>,
+    flag_suite: Vec<String>,
+    flag_proto: Vec<String>,
+    flag_certs: Option<String>,
+    flag_key: Option<String>,
+    flag_ocsp: Option<String>,
+    flag_auth: Option<String>,
+    flag_require_auth: bool,
+    flag_resumption: bool,
+    flag_tickets: bool,
+}
+
+pub struct TlsTcpListener {
+    server: mio_tls::net::TcpListener,
+    connections: Vec<usize>, //HashMap<mio_tls::Token, TlsTcpServerConnection>,
+    next_id: usize,
+    tls_config: Arc<rustls::ServerConfig>,
+    //mode: ServerMode,
+}
+
+impl TlsTcpListener {
+    fn new(server: mio_tls::net::TcpListener, cfg: Arc<rustls::ServerConfig>) -> Self {
+        TlsTcpListener {
+            server,
+            connections: Vec::new(),
+            next_id: 2,
+            tls_config: cfg,
+            //mode,
+        }
+    }
+
+    fn listener(addr: SocketAddr) -> TlsTcpListener {
+        let version =
+            env!("CARGO_PKG_NAME").to_string() + ", version: " + env!("CARGO_PKG_VERSION");
+        let args: Args = Args {
+            flag_port: Some(addr.port()),
+            flag_verbose: false,
+            flag_protover: Vec::new(),
+            flag_suite: Vec::new(),
+            flag_proto: Vec::new(),
+            flag_certs: Some("src/sec/end.fullchain".to_string()),
+            flag_key: Some("src/sec/end.rsa".to_string()),
+            flag_ocsp: None,
+            flag_auth: None,
+            flag_require_auth: false,
+            flag_resumption: false,
+            flag_tickets: false,
+        };
+
+        let config = make_config(&args);
+        let mut server = mio_tls::net::TcpListener::bind(addr).expect("cannot listen on port");
+
+        TlsTcpListener {
+            server: server,
+            connections: Vec::new(),
+            next_id: 2,
+            tls_config: config,
+            //mode,
+        }
+    }
+
+    fn accept_connection(&mut self) -> Result<Option<TlsTcpServerConnection>, io::Error> {
+        loop {
+            match self.server.accept() {
+                Ok((socket, addr)) => {
+                    debug!("Accepting new connection from {:?}", addr);
+
+                    let tls_conn =
+                        rustls::ServerConnection::new(Arc::clone(&self.tls_config)).unwrap();
+
+                    let connection = TlsTcpServerConnection::new(socket, tls_conn);
+
+                    self.connections.push(self.next_id);
+                    self.next_id += 1;
+                    return Ok(Some(connection));
+                }
+
+                Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => return Ok(None),
+                Err(err) => {
+                    println!(
+                        "encountered error while accepting connection; err={:?}",
+                        err
+                    );
+                    return Err(err);
+                }
+            }
+        }
+    }
 }

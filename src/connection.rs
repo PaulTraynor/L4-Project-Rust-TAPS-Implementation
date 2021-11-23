@@ -763,7 +763,7 @@ pub struct TlsTcpServerConnection {
 }
 
 impl TlsTcpServerConnection {
-    fn new(
+    pub fn new(
         socket: mio_tls::net::TcpStream,
         //token: mio_tls::Token,
         //mode: ServerMode,
