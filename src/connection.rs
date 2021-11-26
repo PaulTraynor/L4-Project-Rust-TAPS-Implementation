@@ -23,6 +23,7 @@ use std::net::TcpStream;
 use std::process;
 use std::str;
 use std::sync::{Arc, Mutex};
+use tokio;
 use webpki_roots;
 
 //#[macro_use]
@@ -91,7 +92,9 @@ pub struct QuicConnection {
 }
 
 impl QuicConnection {
-    pub fn connect(addr: SocketAddr) -> Option<std::pin::Pin<Box<quiche::Connection>>> {
+    pub async fn connect(
+        addr: SocketAddr,
+    ) -> tokio::task::JoinHandle<Option<std::pin::Pin<Box<quiche::Connection>>>> {
         const MAX_DATAGRAM_SIZE: usize = 1350;
         let mut buf = [0; 65535];
         let mut out = [0; MAX_DATAGRAM_SIZE];
@@ -168,94 +171,98 @@ impl QuicConnection {
         }
 
         println!("written {}", write);
-
-        loop {
-            poll.poll(&mut events, conn.timeout()).unwrap();
-
-            // Read incoming UDP packets from the socket and feed them to quiche,
-            // until there are no more packets to read.
-            'read: loop {
-                // If the event loop reported no events, it means that the timeout
-                // has expired, so handle it without attempting to read packets. We
-                // will then proceed with the send loop.
-                if events.is_empty() {
-                    println!("timed out");
-                    conn.on_timeout();
-                    break 'read;
-                }
-
-                let (len, from) = match socket.recv_from(&mut buf) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        // There are no more UDP packets to read, so end the read
-                        // loop.
-                        if e.kind() == std::io::ErrorKind::WouldBlock {
-                            println!("recv() would block");
-                            break 'read;
-                        }
-                        panic!("recv() failed: {:?}", e);
-                    }
-                };
-
-                println!("got {} bytes", len);
-
-                let recv_info = quiche::RecvInfo { from };
-
-                // Process potentially coalesced packets.
-                let read = match conn.recv(&mut buf[..len], recv_info) {
-                    Ok(v) => v,
-
-                    Err(e) => {
-                        println!("recv failed: {:?}", e);
-                        continue 'read;
-                    }
-                };
-
-                println!("processed {} bytes", read);
-            }
-
-            println!("done reading");
-
-            if conn.is_closed() {
-                println!("connection closed, {:?}", conn.stats());
-                return None;
-            }
-
-            if conn.is_established() {
-                return Some(conn);
-            }
-
-            // Generate outgoing QUIC packets and send them on the UDP socket, until
-            // quiche reports that there are no more packets to be sent.
+        //let potential_conn =
+        return tokio::spawn(async move {
             loop {
-                let (write, send_info) = match conn.send(&mut out) {
-                    Ok(v) => v,
+                poll.poll(&mut events, conn.timeout()).unwrap();
 
-                    Err(quiche::Error::Done) => {
-                        println!("done writing");
-                        break;
+                // Read incoming UDP packets from the socket and feed them to quiche,
+                // until there are no more packets to read.
+                'read: loop {
+                    // If the event loop reported no events, it means that the timeout
+                    // has expired, so handle it without attempting to read packets. We
+                    // will then proceed with the send loop.
+                    if events.is_empty() {
+                        println!("timed out");
+                        conn.on_timeout();
+                        break 'read;
                     }
 
-                    Err(e) => {
-                        println!("send failed: {:?}", e);
+                    let (len, from) = match socket.recv_from(&mut buf) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            // There are no more UDP packets to read, so end the read
+                            // loop.
+                            if e.kind() == std::io::ErrorKind::WouldBlock {
+                                println!("recv() would block");
+                                break 'read;
+                            }
+                            panic!("recv() failed: {:?}", e);
+                        }
+                    };
 
-                        conn.close(false, 0x1, b"fail").ok();
-                        break;
-                    }
-                };
+                    println!("got {} bytes", len);
 
-                if let Err(e) = socket.send_to(&out[..write], &send_info.to) {
-                    if e.kind() == std::io::ErrorKind::WouldBlock {
-                        println!("send() would block");
-                        break;
-                    }
+                    let recv_info = quiche::RecvInfo { from };
 
-                    panic!("send() failed: {:?}", e);
+                    // Process potentially coalesced packets.
+                    let read = match conn.recv(&mut buf[..len], recv_info) {
+                        Ok(v) => v,
+
+                        Err(e) => {
+                            println!("recv failed: {:?}", e);
+                            continue 'read;
+                        }
+                    };
+
+                    println!("processed {} bytes", read);
                 }
 
-                println!("written {}", write);
+                println!("done reading");
+
+                if conn.is_closed() {
+                    println!("connection closed, {:?}", conn.stats());
+                    return None;
+                }
+
+                if conn.is_established() {
+                    return Some(conn);
+                }
+
+                // Generate outgoing QUIC packets and send them on the UDP socket, until
+                // quiche reports that there are no more packets to be sent.
+                loop {
+                    let (write, send_info) = match conn.send(&mut out) {
+                        Ok(v) => v,
+
+                        Err(quiche::Error::Done) => {
+                            println!("done writing");
+                            break;
+                        }
+
+                        Err(e) => {
+                            println!("send failed: {:?}", e);
+
+                            conn.close(false, 0x1, b"fail").ok();
+                            break;
+                        }
+                    };
+
+                    if let Err(e) = socket.send_to(&out[..write], &send_info.to) {
+                        if e.kind() == std::io::ErrorKind::WouldBlock {
+                            println!("send() would block");
+                            break;
+                        }
+
+                        panic!("send() failed: {:?}", e);
+                    }
+
+                    println!("written {}", write);
+                }
             }
-        }
+        });
+        //let mut out = potential_conn.await.unwrap();
+        //return out;
     }
 }
 
