@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use env_logger;
 use mio_quic;
 use quiche;
@@ -11,7 +12,9 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use tokio;
-use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncWriteExt};
+use tokio::io::{
+    copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncReadExt, AsyncWriteExt,
+};
 use tokio_rustls::rustls::{self, OwnedTrustAnchor};
 use tokio_rustls::{webpki, TlsConnector};
 
@@ -20,12 +23,13 @@ use tokio_rustls::{webpki, TlsConnector};
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
+#[async_trait]
 pub trait ProtocolConnection {
-    fn send(&mut self, buffer: &[u8]);
+    async fn send(&mut self, buffer: &[u8]);
 
-    fn recv(&mut self);
+    async fn recv(&mut self);
 
-    fn close(&mut self);
+    async fn close(&mut self);
 
     //fn abort();
 }
@@ -49,30 +53,30 @@ impl Connection {
 }
 
 pub struct TcpConnection {
-    pub stream: TcpStream,
+    pub stream: tokio::net::TcpStream,
 }
 
 impl TcpConnection {
-    fn connect(addr: SocketAddr) -> TcpConnection {
-        let tcp_stream = TcpStream::connect(addr).unwrap();
+    async fn connect(addr: SocketAddr) -> TcpConnection {
+        let tcp_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         TcpConnection { stream: tcp_stream }
     }
 }
 
+#[async_trait]
 impl ProtocolConnection for TcpConnection {
-    fn send(&mut self, buffer: &[u8]) {
-        self.stream.write(buffer).unwrap();
+    async fn send(&mut self, buffer: &[u8]) {
+        self.stream.write(buffer).await.unwrap();
     }
 
-    fn recv(&mut self) {
+    async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
-        self.stream.read(&mut buffer).unwrap();
+        self.stream.read(&mut buffer).await.unwrap();
     }
 
-    fn close(&mut self) {
-        self.stream
-            .shutdown(Shutdown::Both)
-            .expect("failed to shutdown");
+    async fn close(&mut self) {
+        self.stream.shutdown();
+        //.expect("failed to shutdown");
     }
 }
 
@@ -255,21 +259,22 @@ impl QuicConnection {
     }
 }
 
+#[async_trait]
 impl ProtocolConnection for QuicConnection {
-    fn send(&mut self, buffer: &[u8]) {
+    async fn send(&mut self, buffer: &[u8]) {
         self.conn
             .stream_send(HTTP_REQ_STREAM_ID, buffer, false) // TODO, is fin always false?
             .unwrap();
     }
 
-    fn recv(&mut self) {
+    async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
         self.conn
             .stream_recv(HTTP_REQ_STREAM_ID, &mut buffer)
             .unwrap();
     }
 
-    fn close(&mut self) {
+    async fn close(&mut self) {
         let reason = "connection closed by application";
         self.conn.close(false, 0, &reason.as_bytes()).unwrap();
     }
@@ -277,13 +282,13 @@ impl ProtocolConnection for QuicConnection {
 
 pub struct TlsTcpConnection {
     //stream: tokio::net::TcpStream,
-    tls_conn: tokio_rustls::client::TlsStream<tokio::net::TcpStream>,
+    pub tls_conn: tokio_rustls::client::TlsStream<tokio::net::TcpStream>,
 }
 
 impl TlsTcpConnection {
-    async fn connect(addr: SocketAddr) -> TlsTcpConnection {
+    pub async fn connect(addr: SocketAddr) -> TlsTcpConnection {
         let domain = dns_lookup::lookup_addr(&addr.ip()).unwrap();
-
+        println!("{}", domain.as_str());
         let mut root_cert_store = rustls::RootCertStore::empty();
         root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
             |ta| {
@@ -299,7 +304,6 @@ impl TlsTcpConnection {
             .with_safe_defaults()
             .with_root_certificates(root_cert_store)
             .with_no_client_auth(); // i guess this was previously the default?
-
         let connector = TlsConnector::from(Arc::new(config));
 
         let stream = tokio::net::TcpStream::connect(&addr).await.unwrap();
@@ -308,5 +312,25 @@ impl TlsTcpConnection {
             .unwrap();
         let conn = connector.connect(domain, stream).await.unwrap();
         TlsTcpConnection { tls_conn: conn }
+    }
+}
+
+#[async_trait]
+impl ProtocolConnection for TlsTcpConnection {
+    async fn send(&mut self, buf: &[u8]) {
+        self.tls_conn.write_all(buf);
+    }
+
+    async fn recv(&mut self) {
+        let mut buffer: Vec<u8> = vec![];
+        let (mut reader, mut writer) = split(self.tls_conn);
+        tokio::select! {
+            res = copy(&mut reader, &mut buffer)
+        }
+    }
+
+    async fn close(&mut self) {
+        let (mut reader, mut writer) = split(self.tls_conn);
+        writer.shutdown().await;
     }
 }
