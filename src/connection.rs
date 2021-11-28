@@ -279,10 +279,14 @@ impl ProtocolConnection for QuicConnection {
         self.conn.close(false, 0, &reason.as_bytes()).unwrap();
     }
 }
+enum TlsTcpConn {
+    Client(tokio_rustls::client::TlsStream<tokio::net::TcpStream>),
+    Server(tokio_rustls::server::TlsStream<tokio::net::TcpStream>),
+}
 
 pub struct TlsTcpConnection {
     //stream: tokio::net::TcpStream,
-    pub tls_conn: tokio_rustls::client::TlsStream<tokio::net::TcpStream>,
+    pub tls_conn: TlsTcpConn, //tokio_rustls::client::TlsStream<tokio::net::TcpStream>,
 }
 
 impl TlsTcpConnection {
@@ -311,26 +315,54 @@ impl TlsTcpConnection {
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))
             .unwrap();
         let conn = connector.connect(domain, stream).await.unwrap();
-        TlsTcpConnection { tls_conn: conn }
+        TlsTcpConnection {
+            tls_conn: TlsTcpConn::Client(conn),
+        }
     }
 }
 
 #[async_trait]
 impl ProtocolConnection for TlsTcpConnection {
     async fn send(&mut self, buf: &[u8]) {
-        self.tls_conn.write_all(buf);
+        match self.tls_conn {
+            TlsTcpConn::Client(conn) => {
+                conn.write_all(buf);
+            }
+            TlsTcpConn::Server(conn) => {
+                conn.write_all(buf);
+            }
+        };
     }
 
     async fn recv(&mut self) {
         let mut buffer: Vec<u8> = vec![];
-        let (mut reader, mut writer) = split(self.tls_conn);
-        tokio::select! {
-            res = copy(&mut reader, &mut buffer)
-        }
+
+        match self.tls_conn {
+            TlsTcpConn::Client(conn) => {
+                let (mut reader, mut writer) = split(conn);
+                tokio::select! {
+                    res = copy(&mut reader, &mut buffer)
+                }
+            }
+            TlsTcpConn::Server(conn) => {
+                let (mut reader, mut writer) = split(conn);
+                tokio::select! {
+                    res = copy(&mut reader, &mut buffer)
+                }
+            }
+        };
     }
 
     async fn close(&mut self) {
-        let (mut reader, mut writer) = split(self.tls_conn);
-        writer.shutdown().await;
+        match self.tls_conn {
+            TlsTcpConn::Client(conn) => {
+                let (mut reader, mut writer) = split(conn);
+                writer.shutdown().await;
+            }
+            TlsTcpConn::Server(conn) => {
+                let (mut reader, mut writer) = split(conn);
+                writer.shutdown().await;
+            }
+        };
     }
 }
