@@ -75,7 +75,7 @@ impl ProtocolConnection for TcpConnection {
     }
 
     async fn close(&mut self) {
-        self.stream.shutdown();
+        self.stream.shutdown().await;
         //.expect("failed to shutdown");
     }
 }
@@ -279,7 +279,7 @@ impl ProtocolConnection for QuicConnection {
         self.conn.close(false, 0, &reason.as_bytes()).unwrap();
     }
 }
-enum TlsTcpConn {
+pub enum TlsTcpConn {
     Client(tokio_rustls::client::TlsStream<tokio::net::TcpStream>),
     Server(tokio_rustls::server::TlsStream<tokio::net::TcpStream>),
 }
