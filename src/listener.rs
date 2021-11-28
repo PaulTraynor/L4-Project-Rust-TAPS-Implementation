@@ -129,6 +129,7 @@ impl QuicListener {
     pub async fn recv_connection(&mut self) -> std::pin::Pin<Box<quiche::Connection>> {
         let mut buf = [0; 65535];
         let mut out = [0; MAX_DATAGRAM_SIZE];
+
         loop {
             // Read incoming UDP packets from the socket and feed them to quiche,
             // until there are no more packets to read.
@@ -244,25 +245,6 @@ impl QuicListener {
                     //self.client_map.get_mut(&scid).unwrap();
                     return conn;
                 }
-                //else {
-                //match self.client_map.get_mut(&hdr.dcid) {
-                //  Some(v) => v,
-                //None => self.client_map.get_mut(&conn_id).unwrap(),
-                //}
-                //};
-                //return client.conn;
-                /*
-                let recv_info = quiche::RecvInfo { from };
-                // Process potentially coalesced packets.
-                let read = match client.conn.recv(pkt_buf, recv_info) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("{} recv failed: {:?}", client.conn.trace_id(), e);
-                        continue 'read;
-                    }
-                };
-                debug!("{} processed {} bytes", client.conn.trace_id(), read);
-                */
             }
         }
     }
@@ -335,4 +317,42 @@ fn load_keys(path: &Path) -> io::Result<Vec<PrivateKey>> {
     rsa_private_keys(&mut BufReader::new(File::open(path)?))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid key"))
         .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
+}
+
+pub struct TlsTcpListener {
+    acceptor: TlsAcceptor,
+    listener: TcpListener,
+}
+
+impl TlsTcpListener {
+    pub async fn listener(addr: SocketAddr) -> TlsTcpListener {
+        let certs = load_certs(Path::new("p")).unwrap();
+        let mut keys = load_keys(Path::new("p")).unwrap();
+
+        let config = rustls::ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(certs, keys.remove(0))
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))
+            .unwrap();
+        let acceptor = TlsAcceptor::from(Arc::new(config));
+
+        let listener = TcpListener::bind(&addr).await.unwrap();
+
+        TlsTcpListener {
+            acceptor: acceptor,
+            listener: listener,
+        }
+    }
+
+    pub async fn accept_connection(server: TlsTcpListener) -> TlsTcpConnection {
+        let (stream, peer_addr) = server.listener.accept().await.unwrap();
+        let acceptor = server.acceptor.clone();
+
+        let stream = acceptor.accept(stream).await.unwrap();
+
+        TlsTcpConnection {
+            tls_conn: TlsTcpConn::Server(stream),
+        }
+    }
 }
