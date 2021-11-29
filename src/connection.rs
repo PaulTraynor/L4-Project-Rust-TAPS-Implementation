@@ -12,14 +12,9 @@ use std::net::TcpListener;
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 use tokio;
-use tokio::io::{
-    copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncReadExt, AsyncWriteExt,
-};
+use tokio::io::{copy, split, AsyncReadExt, AsyncWriteExt};
 use tokio_rustls::rustls::{self, OwnedTrustAnchor};
 use tokio_rustls::{webpki, TlsConnector};
-
-//#[macro_use]
-//crate serde_derive;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
@@ -269,9 +264,12 @@ impl ProtocolConnection for QuicConnection {
 
     async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
-        self.conn
-            .stream_recv(HTTP_REQ_STREAM_ID, &mut buffer)
-            .unwrap();
+        for s in self.conn.readable() {
+            while let Ok((read, fin)) = self.conn.stream_recv(s, &mut buffer) {
+                let stream_buf = &buffer[..read];
+            }
+            //buffer
+        }
     }
 
     async fn close(&mut self) {
