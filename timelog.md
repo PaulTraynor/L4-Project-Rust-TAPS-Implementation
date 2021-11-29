@@ -172,7 +172,7 @@
 ### 24 Nov 2021
 
 * *0.5 hours* Meeting with supervisor 
-* *1 hour* Investing whether Tokio and Mio can interoperate 
+* *1 hour* Investigating whether Tokio and Mio can interoperate 
 
 ### 26 Nov 2021
 
