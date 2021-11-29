@@ -169,3 +169,29 @@
 
 * *4 hours* Coding TLS over TCP listener 
 
+### 24 Nov 2021
+
+* *0.5 hours* Meeting with supervisor 
+* *1 hour* Investing whether Tokio and Mio can interoperate 
+
+### 26 Nov 2021
+
+* *2 hours* Started reimplementing TLS over TCP using tokio-rustls
+* *1 hour* Made existing QUIC connect method asynchronous using Tokio
+
+### 27 Nov 2021
+
+* *2 hours* Converted all existing send, receive and close methods to be asynchronous 
+* *1 hours* Converted existing listener methods to be asynchronous 
+
+### 28 Nov 2021
+
+* *2 hours* Completed implementation of TLS over TCP using tokio-rustls
+
+## Week 10
+
+### 29 Nov 2021
+
+* *0.5 hours* Modified QUIC receive method to check all readable streams 
+* *2 hours* Researching and experimenting with external HTTP libraries to be used for framing HTTP requests and responses 
+* *1 hour* Added selection properties from TAPS and relevant security parameters 
