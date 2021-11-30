@@ -1,4 +1,4 @@
-struct TransportProperties {
+pub struct TransportProperties {
     selectionProperties: Vec<SelectionProperty>,
     connectionProperties: Vec<ConnectionProperty>,
 }
@@ -22,11 +22,12 @@ enum SelectionProperty {
     PreserveOrder(Preference),
     Multistreaming(Preference),
     CongestionControl(Preference),
+    Secure(Preference),
 }
 
 enum ConnectionProperty {}
 
-struct SecurityParameters {
+pub struct SecurityParameters {
     certificate_path: String,
     private_key_path: String,
 }
