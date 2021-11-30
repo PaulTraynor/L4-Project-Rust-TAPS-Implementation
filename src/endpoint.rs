@@ -7,3 +7,7 @@ pub enum RemoteEndpoint {
     Ipv6Port(Ipv6Addr, u16),
 }
 
+pub enum LocalEndpoint {
+    Ipv4Port(Ipv4Addr, u16),
+    Ipv6Port(Ipv6Addr, u16),
+}
