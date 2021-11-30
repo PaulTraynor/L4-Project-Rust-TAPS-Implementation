@@ -1,5 +1,5 @@
 pub struct TransportProperties {
-    selectionProperties: Vec<SelectionProperty>,
+    pub selectionProperties: Vec<SelectionProperty>,
     connectionProperties: Vec<ConnectionProperty>,
 }
 
@@ -16,7 +16,7 @@ impl TransportProperties {
     }
 }
 
-enum SelectionProperty {
+pub enum SelectionProperty {
     Reliability(Preference),
     PreserveMsgBoundaries(Preference),
     PreserveOrder(Preference),
