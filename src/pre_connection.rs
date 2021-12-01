@@ -76,13 +76,13 @@ fn gather_candidates(
             Reliability(pref) => match pref {
                 Prefer => {
                     if protocols.contains_key("tcp") {
-                        protocols["tcp"] += 1;
+                        *protocols.get_mut("tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("tls_tcp") {
-                        protocols["tls_tcp"] += 1;
+                        *protocols.get_mut("tls_tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -94,13 +94,13 @@ fn gather_candidates(
             PreserveMsgBoundaries(pref) => match pref {
                 Prefer => {
                     if protocols.contains_key("tcp") {
-                        protocols["tcp"] += 1;
+                        *protocols.get_mut("tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("tls_tcp") {
-                        protocols["tls_tcp"] += 1;
+                        *protocols.get_mut("tls_tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -112,13 +112,13 @@ fn gather_candidates(
             PreserveOrder(pref) => match pref {
                 Prefer => {
                     if protocols.contains_key("tcp") {
-                        protocols["tcp"] += 1;
+                        *protocols.get_mut("tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("tls_tcp") {
-                        protocols["tls_tcp"] += 1;
+                        *protocols.get_mut("tls_tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -134,7 +134,7 @@ fn gather_candidates(
                 }
                 Prefer => {
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -144,13 +144,13 @@ fn gather_candidates(
             CongestionControl(pref) => match pref {
                 Prefer => {
                     if protocols.contains_key("tcp") {
-                        protocols["tcp"] += 1;
+                        *protocols.get_mut("tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("tls_tcp") {
-                        protocols["tls_tcp"] += 1;
+                        *protocols.get_mut("tls_tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -164,18 +164,20 @@ fn gather_candidates(
                     protocols.remove("tcp");
                     match caller_type {
                         CallerType::Server => match security_parameters {
+                            Some(_) => {}
                             None => {
                                 panic!("Security parameters not specified on listener");
                             }
                         },
+                        CallerType::Client => {}
                     }
                 }
                 Prefer => {
                     if protocols.contains_key("tls_tcp") {
-                        protocols["tls_tcp"] += 1;
+                        *protocols.get_mut("tls_tcp").unwrap() += 1;
                     }
                     if protocols.contains_key("quic") {
-                        protocols["quic"] += 1;
+                        *protocols.get_mut("quic").unwrap() += 1;
                     }
                 }
                 Prohibit => {
@@ -188,10 +190,10 @@ fn gather_candidates(
     if protocols.is_empty() {
         panic!("No procols match selected preferences");
     }
-    let final_protocols = Vec::new();
+    let mut final_protocols = Vec::new();
     for (k, v) in protocols.iter() {
         final_protocols.push(CandidateProtocol {
-            name: *k,
+            name: k.to_string(),
             preference: *v,
         });
     }
