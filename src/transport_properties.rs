@@ -41,7 +41,7 @@ impl SecurityParameters {
     }
 }
 
-enum Preference {
+pub enum Preference {
     Require,
     Prefer,
     Ignore,
