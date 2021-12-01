@@ -322,45 +322,36 @@ impl TlsTcpConnection {
 #[async_trait]
 impl ProtocolConnection for TlsTcpConnection {
     async fn send(&mut self, buf: &[u8]) {
-        match self.tls_conn {
+        match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
-                conn.write_all(buf);
+                conn.write_all(buf).await;
             }
             TlsTcpConn::Server(conn) => {
-                conn.write_all(buf);
+                conn.write_all(buf).await;
             }
-        };
+        }
     }
 
     async fn recv(&mut self) {
-        let mut buffer: Vec<u8> = vec![];
-
-        match self.tls_conn {
+        let mut buffer: [u8; 1024] = [0; 1024];
+        match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
-                let (mut reader, mut writer) = split(conn);
-                tokio::select! {
-                    res = copy(&mut reader, &mut buffer)
-                }
+                conn.read(&mut buffer).await;
             }
             TlsTcpConn::Server(conn) => {
-                let (mut reader, mut writer) = split(conn);
-                tokio::select! {
-                    res = copy(&mut reader, &mut buffer)
-                }
+                conn.read(&mut buffer).await;
             }
-        };
+        }
     }
 
     async fn close(&mut self) {
-        match self.tls_conn {
+        match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
-                let (mut reader, mut writer) = split(conn);
-                writer.shutdown().await;
+                conn.shutdown().await;
             }
             TlsTcpConn::Server(conn) => {
-                let (mut reader, mut writer) = split(conn);
-                writer.shutdown().await;
+                conn.shutdown().await;
             }
-        };
+        }
     }
 }
