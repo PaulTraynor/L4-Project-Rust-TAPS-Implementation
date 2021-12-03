@@ -89,7 +89,7 @@ impl ProtocolConnection for TcpConnection {
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
 
 pub struct QuicConnection {
-    pub conn: quinn::NewConnection,
+    pub conn: quinn::Connection,
     pub send: quinn::SendStream,
     pub recv: quinn::RecvStream,
 }
@@ -141,9 +141,9 @@ impl QuicConnection {
                         connection: conn, ..
                     } = new_conn;
                     match conn.open_bi().await {
-                        Ok((mut send, recv)) => {
+                        Ok((send, recv)) => {
                             return Some(QuicConnection {
-                                conn: new_conn,
+                                conn: conn,
                                 send: send,
                                 recv: recv,
                             })
@@ -160,24 +160,17 @@ impl QuicConnection {
 #[async_trait]
 impl ProtocolConnection for QuicConnection {
     async fn send(&mut self, buffer: &[u8]) {
-        self.conn
-            .stream_send(HTTP_REQ_STREAM_ID, buffer, false) // TODO, is fin always false?
-            .unwrap();
+        self.send.write_all(buffer).await;
     }
 
     async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
-        for s in self.conn.readable() {
-            while let Ok((read, fin)) = self.conn.stream_recv(s, &mut buffer) {
-                let stream_buf = &buffer[..read];
-            }
-            //buffer
-        }
+        let resp = self.recv.read(&mut buffer).await;
     }
 
     async fn close(&mut self) {
-        let reason = "connection closed by application";
-        self.conn.close(false, 0, &reason.as_bytes()).unwrap();
+        //self.send.finish().await;
+        self.conn.close(0u32.into(), b"done");
     }
 }
 pub enum TlsTcpConn {
