@@ -2,6 +2,7 @@ use crate::endpoint::LocalEndpoint;
 use crate::error;
 use crate::pre_connection::PreConnection;
 use async_trait::async_trait;
+use dns_lookup;
 use env_logger;
 use mio_quic;
 use quiche;
@@ -88,11 +89,17 @@ impl ProtocolConnection for TcpConnection {
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
 
 pub struct QuicConnection {
-    pub conn: std::pin::Pin<Box<quiche::Connection>>,
+    pub conn: quinn::NewConnection,
+    pub send: quinn::SendStream,
+    pub recv: quinn::RecvStream,
 }
 
 impl QuicConnection {
-    pub async fn connect(addr: SocketAddr, pre_connection: PreConnection) -> Option<String> {
+    pub async fn connect(
+        addr: SocketAddr,
+        pre_connection: PreConnection,
+        hostname: String,
+    ) -> Option<QuicConnection> {
         let mut roots = rustls::RootCertStore::empty();
         match pre_connection.security_parameters {
             Some(files) => match fs::read(&files.certificate_path) {
@@ -127,7 +134,27 @@ impl QuicConnection {
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
-        return None;
+        match endpoint.connect(addr, &hostname) {
+            Ok(v) => match v.await {
+                Ok(new_conn) => {
+                    let quinn::NewConnection {
+                        connection: conn, ..
+                    } = new_conn;
+                    match conn.open_bi().await {
+                        Ok((mut send, recv)) => {
+                            return Some(QuicConnection {
+                                conn: new_conn,
+                                send: send,
+                                recv: recv,
+                            })
+                        }
+                        Err(e) => return None,
+                    }
+                }
+                Err(e) => return None,
+            },
+            Err(e) => return None,
+        }
     }
 }
 #[async_trait]
