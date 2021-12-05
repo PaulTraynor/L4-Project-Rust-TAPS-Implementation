@@ -1,22 +1,19 @@
+use http;
+use serde::de;
+
 pub trait Framer {
     type Message;
 
     fn from_bytes(&self, raw_bytes: &[u8]) -> Self::Message;
-    fn to_bytes<'a>(&self, message: &'a Self::Message) -> &'a [u8];
+    fn to_bytes<'t>(&self, message: &Self::Message) -> &'t [u8];
 }
 
-pub struct StringFramer {
+pub struct HttpRequestFramer {}
 
-}
+impl Framer for HttpRequestFramer {
+    type Message = http::request::Request<String>;
 
-impl Framer for StringFramer {
-    type Message = String;
+    fn from_bytes(&self, raw_bytes: &[u8]) -> Self::Message {}
 
-    fn from_bytes(&self, raw_bytes: &[u8]) -> Self::Message {
-        String::from_utf8_lossy(raw_bytes).to_string()
-    }
-
-    fn to_bytes<'a>(&self, message: &'a Self::Message) -> &'a [u8] {
-        message.as_bytes()//.clone()
-    }
+    fn to_bytes(&self, message: &Self::Message) -> &[u8] {}
 }
