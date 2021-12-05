@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 pub struct TransportProperties {
     pub selectionProperties: Vec<SelectionProperty>,
     connectionProperties: Vec<ConnectionProperty>,
@@ -28,12 +30,12 @@ pub enum SelectionProperty {
 enum ConnectionProperty {}
 
 pub struct SecurityParameters {
-    certificate_path: String,
-    private_key_path: String,
+    pub certificate_path: PathBuf,
+    pub private_key_path: PathBuf,
 }
 
 impl SecurityParameters {
-    pub fn new(path_1: String, path_2: String) -> SecurityParameters {
+    pub fn new(path_1: PathBuf, path_2: PathBuf) -> SecurityParameters {
         SecurityParameters {
             certificate_path: path_1,
             private_key_path: path_2,
