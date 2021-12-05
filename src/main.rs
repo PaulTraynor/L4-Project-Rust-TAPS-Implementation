@@ -1,21 +1,38 @@
 mod connection;
-mod framer;
-mod local_endpoint;
+mod endpoint;
+//mod framer;
+mod error;
+mod listener;
 mod pre_connection;
-mod remote_endpoint;
+mod transport_properties;
 use crate::connection::QuicConnection;
-use crate::framer::*;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use crate::connection::TlsTcpConnection;
+//use crate::framer::*;
+use crate::transport_properties::*;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncWriteExt};
+use trust_dns_resolver::config::*;
+use trust_dns_resolver::Resolver;
 
+//#[tokio::main]
 fn main() {
-    let framer = StringFramer {};
-    let string = "hello".to_string();
-    let bytes = framer.to_bytes(&string);
+    //let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 4433);
+    //let quic_conn = QuicConnection::connect(addr).await;
+    //let host = dns_lookup::lookup_host("youtube.com").unwrap()[0];
+    //let addr = SocketAddr::new(host, 443);
+    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
+    let response = resolver.lookup_ip("www.google.co.uk").unwrap();
 
-    println!("original: {}", framer.from_bytes(&bytes[..]));
-
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-    let quic_conn = QuicConnection::connect(addr);
+    for resp in response.iter() {
+        println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
+    }
+    //for ip in host {
+    //  println!("{}", dns_lookup::lookup_addr(&ip).unwrap())
+    //}
+    //let mut tls_conn = TlsTcpConnection::connect(addr).await;
+    //tls_conn
+    //  .tls_conn
+    //.write_all(b"GET / HTTP/1.0\r\nHost: www.google.com\r\n\r\n");
     /*
     let res = match quic_conn {
         Some(v) => {
@@ -26,5 +43,5 @@ fn main() {
     println!("{:?}", res);
     */
 
-    println!("{}", quic_conn.unwrap().is_established());
+    //println!("{}", quic_conn.await.unwrap().unwrap().is_established());
 }
