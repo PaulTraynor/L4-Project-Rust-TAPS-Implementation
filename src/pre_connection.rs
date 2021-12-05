@@ -8,6 +8,7 @@ use dns_lookup::lookup_host;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 
 pub struct PreConnection {
     pub local_endpoint: Option<endpoint::LocalEndpoint>,
@@ -65,10 +66,12 @@ impl PreConnection {
         }
 
         // candidate gathering...
-
         let candidates = self.gather_candidates(CallerType::Client);
 
-        // candidate racing...
+        // connection racing...
+
+        let conn = tokio::select! {};
+
         let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
 
         let tcp_connection = Box::new(TcpConnection { stream: stream });
@@ -78,6 +81,18 @@ impl PreConnection {
     }
 
     //fn listen(&self) -> Listener {}
+
+    async fn race_connections(
+        candidates: Vec<CandidateProtocol>,
+        ips: Vec<SocketAddr>,
+    ) -> Connection {
+        let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
+
+        let tcp_connection = Box::new(TcpConnection { stream: stream });
+        Connection {
+            protocol_impl: tcp_connection,
+        }
+    }
 
     fn gather_candidates(&mut self, caller_type: CallerType) -> Vec<CandidateProtocol> {
         let mut protocols = HashMap::new();
