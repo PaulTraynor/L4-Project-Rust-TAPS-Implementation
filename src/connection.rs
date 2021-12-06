@@ -63,9 +63,11 @@ pub struct TcpConnection {
 }
 
 impl TcpConnection {
-    async fn connect(addr: SocketAddr) -> TcpConnection {
-        let tcp_stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        TcpConnection { stream: tcp_stream }
+    pub async fn connect(addr: SocketAddr) -> Option<TcpConnection> {
+        match tokio::net::TcpStream::connect(addr).await {
+            Ok(conn) => Some(TcpConnection { stream: conn }),
+            Err(e) => None,
+        }
     }
 }
 
@@ -98,11 +100,12 @@ impl QuicConnection {
     pub async fn connect(
         addr: SocketAddr,
         pre_connection: PreConnection,
+        cert_path: PathBuf,
         hostname: String,
     ) -> Option<QuicConnection> {
         let mut roots = rustls::RootCertStore::empty();
         match pre_connection.security_parameters {
-            Some(files) => match fs::read(&files.certificate_path) {
+            Some(files) => match fs::read(cert_path) {
                 Ok(v) => match roots.add(&rustls::Certificate(v)) {
                     Ok(_) => {}
                     Err(_) => return None,
@@ -184,9 +187,7 @@ pub struct TlsTcpConnection {
 }
 
 impl TlsTcpConnection {
-    pub async fn connect(addr: SocketAddr) -> TlsTcpConnection {
-        let domain = dns_lookup::lookup_addr(&addr.ip()).unwrap();
-        println!("{}", domain.as_str());
+    pub async fn connect(addr: SocketAddr, host: String) -> TlsTcpConnection {
         let mut root_cert_store = rustls::RootCertStore::empty();
         root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
             |ta| {
@@ -205,7 +206,7 @@ impl TlsTcpConnection {
         let connector = TlsConnector::from(Arc::new(config));
 
         let stream = tokio::net::TcpStream::connect(&addr).await.unwrap();
-        let domain = rustls::ServerName::try_from(domain.as_str())
+        let domain = rustls::ServerName::try_from(host.as_str())
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))
             .unwrap();
         let conn = connector.connect(domain, stream).await.unwrap();
