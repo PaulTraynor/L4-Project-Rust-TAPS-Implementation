@@ -431,14 +431,14 @@ enum CallerType {
     Server,
 }
 
-async fn race_connections(candidate_connections: Vec<CandidateConnection>) {
+async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Option<Connection> {
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let quic_map = Arc::new(Mutex::new(HashMap::new()));
 
-    //let tcp_map_clone = Arc::new(Mutex::new(HashMap::new()));
-    //let tls_tcp_map_clone = Arc::new(Mutex::new(HashMap::new()));
-    //let quic_map_clone = Arc::new(Mutex::new(HashMap::new()));
+    let tcp_map_clone = tcp_map.clone();
+    let tls_tcp_map_clone = tls_tcp_map.clone();
+    let quic_map_clone = quic_map.clone();
 
     let found = false;
     let found = Arc::new(Mutex::new(found));
@@ -488,7 +488,31 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) {
     .unwrap()
         == true
     {
-        return;
+        if !tcp_map_clone.lock().unwrap().is_empty() {
+            let mut conn = tcp_map_clone.lock().unwrap();
+            let conn = conn.remove("conn").unwrap();
+            return Some(Connection {
+                protocol_impl: Box::new(conn),
+            });
+        }
+        if !tls_tcp_map_clone.lock().unwrap().is_empty() {
+            let mut conn = tls_tcp_map_clone.lock().unwrap();
+            let conn = conn.remove("conn").unwrap();
+            return Some(Connection {
+                protocol_impl: Box::new(conn),
+            });
+        }
+        if !quic_map_clone.lock().unwrap().is_empty() {
+            let mut conn = quic_map_clone.lock().unwrap();
+            let conn = conn.remove("conn").unwrap();
+            return Some(Connection {
+                protocol_impl: Box::new(conn),
+            });
+        } else {
+            return None;
+        }
+    } else {
+        return None;
     }
 }
 
