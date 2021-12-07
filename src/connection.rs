@@ -99,41 +99,26 @@ pub struct QuicConnection {
 impl QuicConnection {
     pub async fn connect(
         addr: SocketAddr,
-        pre_connection: PreConnection,
+        local_endpoint: SocketAddr,
         cert_path: PathBuf,
         hostname: String,
     ) -> Option<QuicConnection> {
         let mut roots = rustls::RootCertStore::empty();
-        match pre_connection.security_parameters {
-            Some(files) => match fs::read(cert_path) {
-                Ok(v) => match roots.add(&rustls::Certificate(v)) {
-                    Ok(_) => {}
-                    Err(_) => return None,
-                },
-                Err(e) => return None,
+
+        match fs::read(cert_path) {
+            Ok(v) => match roots.add(&rustls::Certificate(v)) {
+                Ok(_) => {}
+                Err(_) => return None,
             },
-            None => return None,
+            Err(e) => return None,
         }
+
         let mut client_crypto = rustls::ClientConfig::builder()
             .with_safe_defaults()
             .with_root_certificates(roots)
             .with_no_client_auth();
         client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
 
-        let local_endpoint = match pre_connection.local_endpoint {
-            Some(v) => match v {
-                LocalEndpoint::Ipv4Port(ip, port) => SocketAddr::from(SocketAddrV4::new(ip, port)),
-                LocalEndpoint::Ipv6Port(ip, port) => {
-                    SocketAddr::from(SocketAddrV6::new(ip, port, 0, 0))
-                }
-            },
-            None => SocketAddr::from(SocketAddrV6::new(
-                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-                0,
-                0,
-                0,
-            )),
-        };
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
@@ -187,7 +172,7 @@ pub struct TlsTcpConnection {
 }
 
 impl TlsTcpConnection {
-    pub async fn connect(addr: SocketAddr, host: String) -> TlsTcpConnection {
+    pub async fn connect(addr: SocketAddr, host: String) -> Option<TlsTcpConnection> {
         let mut root_cert_store = rustls::RootCertStore::empty();
         root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
             |ta| {
@@ -210,9 +195,9 @@ impl TlsTcpConnection {
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))
             .unwrap();
         let conn = connector.connect(domain, stream).await.unwrap();
-        TlsTcpConnection {
+        Some(TlsTcpConnection {
             tls_conn: TlsTcpConn::Client(conn),
-        }
+        })
     }
 }
 
