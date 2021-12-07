@@ -59,8 +59,8 @@ impl QuicListener {
     ) -> Option<QuicListener> {
         let security_params = pre_connection.security_parameters.unwrap();
         let (cert_path, key_path) = (
-            &security_params.certificate_path,
-            &security_params.private_key_path,
+            &security_params.certificate_path.unwrap(),
+            &security_params.private_key_path.unwrap(),
         );
         let key = fs::read(key_path).expect("failed to read private key");
         let key = if key_path.extension().map_or(false, |x| x == "der") {

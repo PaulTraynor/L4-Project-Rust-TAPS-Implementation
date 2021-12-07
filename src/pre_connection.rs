@@ -1,12 +1,12 @@
 use crate::connection::*;
 use crate::endpoint;
-//use crate::endpoint::LocalEndpoint::*;
-use crate::endpoint::RemoteEndpoint::*;
+use crate::endpoint::LocalEndpoint::{Ipv4Port, Ipv6Port};
+use crate::endpoint::RemoteEndpoint;
 use crate::transport_properties;
 use crate::transport_properties::SelectionProperty::*;
 use dns_lookup::lookup_host;
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -14,7 +14,9 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-type ConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
+type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
+type TlsTcpConnRecord = Arc<Mutex<HashMap<String, TlsTcpConnection>>>;
+type QuicConnRecord = Arc<Mutex<HashMap<String, QuicConnection>>>;
 type ConnFound = Arc<Mutex<bool>>;
 
 pub struct PreConnection {
@@ -47,7 +49,7 @@ impl PreConnection {
 
         match &self.remote_endpoint {
             Some(v) => match v {
-                HostnamePort(host, port) => {
+                RemoteEndpoint::HostnamePort(host, port) => {
                     let dns_ips = match dns_lookup::lookup_host(&host) {
                         Ok(v) => v,
                         Err(e) => panic!("failed to lookup host"),
@@ -71,9 +73,24 @@ impl PreConnection {
                             if candidate == "quic".to_string() {
                                 if let Some(files) = &self.security_parameters {
                                     if let Some(cert_path) = &files.certificate_path {
+                                        let local_endpoint = match &self.local_endpoint {
+                                            Some(endpoint) => match endpoint {
+                                                Ipv4Port(ip, port) => {
+                                                    SocketAddr::new(IpAddr::V4(*ip), *port)
+                                                }
+                                                Ipv6Port(ip, port) => {
+                                                    SocketAddr::new(IpAddr::V6(*ip), *port)
+                                                }
+                                            },
+                                            None => SocketAddr::new(
+                                                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                                                8080,
+                                            ),
+                                        };
                                         let quic_candidate =
                                             CandidateConnection::Quic(QuicCandidate {
                                                 addr: SocketAddr::new(*ip, *port),
+                                                local_endpoint: local_endpoint,
                                                 host: host.to_string(),
                                                 cert_path: cert_path.to_path_buf(),
                                             });
@@ -84,7 +101,7 @@ impl PreConnection {
                         }
                     }
                 }
-                Ipv4Port(ip, port) => {
+                RemoteEndpoint::Ipv4Port(ip, port) => {
                     //ips.push(SocketAddr::new(IpAddr::V4(*ip), *port));
                     let host = match dns_lookup::lookup_addr(&IpAddr::V4(*ip)) {
                         Ok(str) => str,
@@ -109,8 +126,23 @@ impl PreConnection {
                         if candidate == "quic".to_string() {
                             if let Some(files) = &self.security_parameters {
                                 if let Some(cert_path) = &files.certificate_path {
+                                    let local_endpoint = match &self.local_endpoint {
+                                        Some(endpoint) => match endpoint {
+                                            Ipv4Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V4(*ip), *port)
+                                            }
+                                            Ipv6Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V6(*ip), *port)
+                                            }
+                                        },
+                                        None => SocketAddr::new(
+                                            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                                            8080,
+                                        ),
+                                    };
                                     let quic_candidate = CandidateConnection::Quic(QuicCandidate {
                                         addr: SocketAddr::new(IpAddr::V4(*ip), *port),
+                                        local_endpoint: local_endpoint,
                                         host: host.to_string(),
                                         cert_path: cert_path.to_path_buf(),
                                     });
@@ -120,7 +152,7 @@ impl PreConnection {
                         }
                     }
                 }
-                Ipv6Port(ip, port) => {
+                RemoteEndpoint::Ipv6Port(ip, port) => {
                     //ips.push(SocketAddr::new(IpAddr::V6(*ip), *port));
                     let host = match dns_lookup::lookup_addr(&IpAddr::V6(*ip)) {
                         Ok(str) => str,
@@ -145,8 +177,23 @@ impl PreConnection {
                         if candidate == "quic".to_string() {
                             if let Some(files) = &self.security_parameters {
                                 if let Some(cert_path) = &files.certificate_path {
+                                    let local_endpoint = match &self.local_endpoint {
+                                        Some(endpoint) => match endpoint {
+                                            Ipv4Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V4(*ip), *port)
+                                            }
+                                            Ipv6Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V6(*ip), *port)
+                                            }
+                                        },
+                                        None => SocketAddr::new(
+                                            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                                            8080,
+                                        ),
+                                    };
                                     let quic_candidate = CandidateConnection::Quic(QuicCandidate {
                                         addr: SocketAddr::new(IpAddr::V6(*ip), *port),
+                                        local_endpoint: local_endpoint,
                                         host: host.to_string(),
                                         cert_path: cert_path.to_path_buf(),
                                     });
@@ -338,7 +385,7 @@ impl PreConnection {
             });
         }
         final_protos.sort_by(|a, b| b.preference.cmp(&a.preference));
-        let final_protocols = Vec::new();
+        let mut final_protocols = Vec::new();
         for proto in final_protos {
             final_protocols.push(proto.name);
         }
@@ -374,6 +421,7 @@ struct TlsTcpCandidate {
 
 struct QuicCandidate {
     addr: SocketAddr,
+    local_endpoint: SocketAddr,
     host: String,
     cert_path: PathBuf,
 }
@@ -384,7 +432,13 @@ enum CallerType {
 }
 
 async fn race_connections(candidate_connections: Vec<CandidateConnection>) {
-    let conn_dict = Arc::new(Mutex::new(HashMap::new()));
+    let tcp_map = Arc::new(Mutex::new(HashMap::new()));
+    let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
+    let quic_map = Arc::new(Mutex::new(HashMap::new()));
+
+    //let tcp_map_clone = Arc::new(Mutex::new(HashMap::new()));
+    //let tls_tcp_map_clone = Arc::new(Mutex::new(HashMap::new()));
+    //let quic_map_clone = Arc::new(Mutex::new(HashMap::new()));
 
     let found = false;
     let found = Arc::new(Mutex::new(found));
@@ -392,22 +446,35 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) {
 
     tokio::spawn(async move {
         for candidate in candidate_connections {
-            let conn_dict = conn_dict.clone();
             let found = found.clone();
             match candidate {
                 CandidateConnection::Tcp(data) => {
+                    let conn_dict = tcp_map.clone();
                     tokio::spawn(async move {
                         run_connection_tcp(data, conn_dict, found);
                     })
                     .await;
                 }
-                CandidateConnection::TlsTcp(data) => {}
-                CandidateConnection::Quic(data) => {}
+                CandidateConnection::TlsTcp(data) => {
+                    let conn_dict = tls_tcp_map.clone();
+                    tokio::spawn(async move {
+                        run_connection_tls_tcp(data, conn_dict, found);
+                    })
+                    .await;
+                }
+                CandidateConnection::Quic(data) => {
+                    let conn_dict = quic_map.clone();
+                    tokio::spawn(async move {
+                        run_connection_quic(data, conn_dict, found);
+                    })
+                    .await;
+                }
             }
-            sleep(Duration::from_millis(200));
+            sleep(Duration::from_millis(200)).await;
         }
     })
-    .await;
+    .await
+    .unwrap();
 
     if tokio::spawn(async move {
         loop {
@@ -425,7 +492,7 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) {
     }
 }
 
-async fn run_connection_tcp(conn: TcpCandidate, map: ConnRecord, found: ConnFound) {
+async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {
     //let mut found = found.lock().unwrap();
     //if !(*found) {
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
@@ -440,15 +507,28 @@ async fn run_connection_tcp(conn: TcpCandidate, map: ConnRecord, found: ConnFoun
     // }
 }
 
-async fn run_connection_tls_tcp(
-    conn: TlsTcpCandidate,
-    host: String,
-    map: ConnRecord,
-    found: ConnFound,
-) {
+async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, found: ConnFound) {
+    if let Some(tls_tcp_conn) = TlsTcpConnection::connect(conn.addr, conn.host).await {
+        let mut map = map.lock().unwrap();
+        let mut found = found.lock().unwrap();
+        if *found == false {
+            map.insert("conn".to_string(), tls_tcp_conn);
+            *found = true;
+        }
+    }
 }
 
-async fn run_connection_quic(conn: QuicCandidate, host: String, map: ConnRecord, found: ConnFound) {
+async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: ConnFound) {
+    if let Some(quic_conn) =
+        QuicConnection::connect(conn.addr, conn.local_endpoint, conn.cert_path, conn.host).await
+    {
+        let mut map = map.lock().unwrap();
+        let mut found = found.lock().unwrap();
+        if *found == false {
+            map.insert("conn".to_string(), quic_conn);
+            *found = true;
+        }
+    }
 }
 
 pub fn get_ips(hostname: &str) -> Vec<std::net::IpAddr> {
