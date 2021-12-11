@@ -427,8 +427,7 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
                     tokio::spawn(async move {
                         println!("run tcp");
                         run_connection_tcp(data, conn_dict, found).await;
-                    })
-                    .await;
+                    });
                 }
                 CandidateConnection::TlsTcp(data) => {
                     let conn_dict = tls_tcp_map.clone();
@@ -447,9 +446,7 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
             }
             sleep(Duration::from_millis(200)).await;
         }
-    })
-    .await
-    .unwrap();
+    });
 
     if tokio::spawn(async move {
         loop {
@@ -466,6 +463,7 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
         if !tcp_map_clone.lock().unwrap().is_empty() {
             let mut conn = tcp_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
+            println!("returning");
             return Some(Connection {
                 protocol_impl: Box::new(conn),
             });

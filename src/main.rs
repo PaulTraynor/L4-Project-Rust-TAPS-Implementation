@@ -35,7 +35,7 @@ async fn main() {
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Prohibit));
 
-    let r_e = RemoteEndpoint::HostnamePort("www.gov.uk".to_string(), 80);
+    let r_e = RemoteEndpoint::HostnamePort("www.sydney.edu.au".to_string(), 80);
     let mut p_c = PreConnection::new(None, Some(r_e), t_p, None);
 
     let data = b"hello";
