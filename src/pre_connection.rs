@@ -3,6 +3,7 @@ use crate::endpoint;
 use crate::endpoint::LocalEndpoint::{Ipv4Port, Ipv6Port};
 use crate::endpoint::RemoteEndpoint;
 use crate::transport_properties;
+use crate::transport_properties::Preference::*;
 use crate::transport_properties::SelectionProperty::*;
 use dns_lookup::lookup_host;
 use std::collections::HashMap;
@@ -41,7 +42,7 @@ impl PreConnection {
         }
     }
 
-    pub async fn initiate(&mut self) -> Connection {
+    pub async fn initiate(&mut self) -> Option<Connection> {
         let mut candidate_connections = Vec::new();
 
         // candidate gathering...
@@ -207,48 +208,12 @@ impl PreConnection {
             None => panic!("no remote endpoint added"),
         }
 
-        /***
-        // connection racing...
-        let conn_dict = Arc::new(Mutex::new(HashMap::new()));
+        let conn = match race_connections(candidate_connections).await {
+            Some(conn) => Some(conn),
+            None => return None,
+        };
 
-        let found = false;
-        let found = Arc::new(Mutex::new(found));
-
-        tokio::spawn(async move {
-            for candidate in candidate_protocols {
-                match candidate {
-                    CandidateConnection::Tcp(data) => {}
-                    CandidateConnection::TlsTcp(data) => {}
-                    CandidateConnection::Quic(data) => {}
-                }
-                sleep(Duration::from_millis(200));
-            }
-        }).await;
-        ***/
-
-        race_connections(candidate_connections).await;
-
-        /***
-        for i in 0..candidates_len {
-            for j in 0..ips_len {
-                if candidates[i].name == "tcp".to_string() {
-                    let map = conn_dict.clone();
-                    //let found = found.clone();
-                    let current_ip = &ips[j];
-                    tokio::spawn(async move {
-                        run_connection_tcp(*current_ip, map).await;
-                    });
-                }
-            }
-        }
-        ***/
-
-        let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
-
-        let tcp_connection = Box::new(TcpConnection { stream: stream });
-        Connection {
-            protocol_impl: tcp_connection,
-        }
+        conn
     }
 
     //fn listen(&self) -> Listener {}
@@ -277,6 +242,7 @@ impl PreConnection {
                         protocols.remove("tls_tcp");
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
                 PreserveMsgBoundaries(pref) => match pref {
                     Prefer => {
@@ -295,6 +261,7 @@ impl PreConnection {
                         protocols.remove("tls_tcp");
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
                 PreserveOrder(pref) => match pref {
                     Prefer => {
@@ -313,6 +280,7 @@ impl PreConnection {
                         protocols.remove("tls_tcp");
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
                 Multistreaming(pref) => match pref {
                     Require => {
@@ -327,6 +295,7 @@ impl PreConnection {
                     Prohibit => {
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
                 CongestionControl(pref) => match pref {
                     Prefer => {
@@ -345,6 +314,7 @@ impl PreConnection {
                         protocols.remove("tls_tcp");
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
                 Secure(pref) => match pref {
                     Require => {
@@ -371,6 +341,7 @@ impl PreConnection {
                         protocols.remove("tls_tcp");
                         protocols.remove("quic");
                     }
+                    _ => {}
                 },
             };
         }
@@ -389,6 +360,7 @@ impl PreConnection {
         for proto in final_protos {
             final_protocols.push(proto.name);
         }
+        println!("final protocols: {:?}", final_protocols);
         final_protocols
     }
 }
@@ -432,6 +404,7 @@ enum CallerType {
 }
 
 async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Option<Connection> {
+    println!("{}", candidate_connections.len());
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let quic_map = Arc::new(Mutex::new(HashMap::new()));
@@ -449,9 +422,11 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
             let found = found.clone();
             match candidate {
                 CandidateConnection::Tcp(data) => {
+                    println!("here");
                     let conn_dict = tcp_map.clone();
                     tokio::spawn(async move {
-                        run_connection_tcp(data, conn_dict, found);
+                        println!("run tcp");
+                        run_connection_tcp(data, conn_dict, found).await;
                     })
                     .await;
                 }
@@ -519,10 +494,12 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
 async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {
     //let mut found = found.lock().unwrap();
     //if !(*found) {
+    println!("trying {}", conn.addr);
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
+            println!("{} won", conn.addr);
             map.insert("conn".to_string(), tcp_conn);
             *found = true;
         }

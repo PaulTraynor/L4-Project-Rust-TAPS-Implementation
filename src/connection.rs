@@ -49,11 +49,11 @@ impl Connection {
         self.protocol_impl.send(buffer);
     }
 
-    fn recv(&mut self) {
+    pub fn recv(&mut self) {
         self.protocol_impl.recv();
     }
 
-    fn close(&mut self) {
+    pub fn close(&mut self) {
         self.protocol_impl.close();
     }
 }

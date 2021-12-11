@@ -7,6 +7,9 @@ mod pre_connection;
 mod transport_properties;
 use crate::connection::QuicConnection;
 use crate::connection::TlsTcpConnection;
+use crate::endpoint::RemoteEndpoint;
+use crate::pre_connection::PreConnection;
+use crate::transport_properties::{Preference, SelectionProperty};
 //use crate::framer::*;
 use crate::transport_properties::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -14,18 +17,42 @@ use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, Async
 use trust_dns_resolver::config::*;
 use trust_dns_resolver::Resolver;
 
-//#[tokio::main]
-fn main() {
+#[tokio::main]
+async fn main() {
     //let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 4433);
     //let quic_conn = QuicConnection::connect(addr).await;
     //let host = dns_lookup::lookup_host("youtube.com").unwrap()[0];
     //let addr = SocketAddr::new(host, 443);
-    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
-    let response = resolver.lookup_ip("www.google.co.uk").unwrap();
+    //let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
+    //let response = resolver.lookup_ip("www.google.co.uk").unwrap();
 
-    for resp in response.iter() {
-        println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
+    //for resp in response.iter() {
+    //  println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
+    //}
+
+    let mut t_p = transport_properties::TransportProperties::new();
+
+    t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
+    t_p.add_selection_property(SelectionProperty::Secure(Preference::Prohibit));
+
+    let r_e = RemoteEndpoint::HostnamePort("www.gov.uk".to_string(), 80);
+    let mut p_c = PreConnection::new(None, Some(r_e), t_p, None);
+
+    let data = b"hello";
+
+    let mut conn = p_c.initiate().await;
+    //conn.send(&data);
+
+    match conn {
+        Some(mut conn) => {
+            println!("sending");
+            conn.send(data);
+        }
+        None => {
+            println!("no conn")
+        }
     }
+
     //for ip in host {
     //  println!("{}", dns_lookup::lookup_addr(&ip).unwrap())
     //}
