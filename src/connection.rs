@@ -1,31 +1,14 @@
-use crate::endpoint::LocalEndpoint;
-use crate::error;
-use crate::pre_connection::PreConnection;
 use async_trait::async_trait;
-use dns_lookup;
-use env_logger;
-use mio_quic;
-use quiche;
 use quinn;
-use ring::rand::*;
 use std::convert::TryFrom;
 use std::io;
-use std::io::{BufReader, Read, Write};
-use std::net::Shutdown;
-use std::net::TcpListener;
-use std::net::TcpStream;
-use std::net::{Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::sync::{Arc, Mutex};
-use std::{
-    fs,
-    net::ToSocketAddrs,
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::{fs, path::PathBuf};
 use tokio;
-use tokio::io::{copy, split, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_rustls::rustls::{self, OwnedTrustAnchor};
-use tokio_rustls::{webpki, TlsConnector};
+use tokio_rustls::TlsConnector;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
