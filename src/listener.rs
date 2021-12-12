@@ -221,9 +221,13 @@ pub struct TlsTcpListener {
 }
 
 impl TlsTcpListener {
-    pub async fn listener(addr: SocketAddr) -> TlsTcpListener {
-        let certs = load_certs(Path::new("p")).unwrap();
-        let mut keys = load_keys(Path::new("p")).unwrap();
+    pub async fn listener(
+        addr: SocketAddr,
+        cert_path: PathBuf,
+        key_path: PathBuf,
+    ) -> Option<TlsTcpListener> {
+        let certs = load_certs(Path::new(&cert_path)).unwrap();
+        let mut keys = load_keys(Path::new(&key_path)).unwrap();
 
         let config = rustls::ServerConfig::builder()
             .with_safe_defaults()
@@ -235,10 +239,10 @@ impl TlsTcpListener {
 
         let listener = TcpListener::bind(&addr).await.unwrap();
 
-        TlsTcpListener {
+        Some(TlsTcpListener {
             acceptor: acceptor,
             listener: listener,
-        }
+        })
     }
 
     pub async fn accept_connection(&self) -> Option<TlsTcpConnection> {

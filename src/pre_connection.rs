@@ -1,6 +1,6 @@
 use crate::connection::*;
 use crate::endpoint;
-use crate::endpoint::LocalEndpoint::{Ipv4Port, Ipv6Port};
+use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
 use crate::listener::*;
 use crate::transport_properties;
@@ -78,10 +78,10 @@ impl PreConnection {
                                     if let Some(cert_path) = &files.certificate_path {
                                         let local_endpoint = match &self.local_endpoint {
                                             Some(endpoint) => match endpoint {
-                                                Ipv4Port(ip, port) => {
+                                                LocalEndpoint::Ipv4Port(ip, port) => {
                                                     SocketAddr::new(IpAddr::V4(*ip), *port)
                                                 }
-                                                Ipv6Port(ip, port) => {
+                                                LocalEndpoint::Ipv6Port(ip, port) => {
                                                     SocketAddr::new(IpAddr::V6(*ip), *port)
                                                 }
                                             },
@@ -131,10 +131,10 @@ impl PreConnection {
                                 if let Some(cert_path) = &files.certificate_path {
                                     let local_endpoint = match &self.local_endpoint {
                                         Some(endpoint) => match endpoint {
-                                            Ipv4Port(ip, port) => {
+                                            LocalEndpoint::Ipv4Port(ip, port) => {
                                                 SocketAddr::new(IpAddr::V4(*ip), *port)
                                             }
-                                            Ipv6Port(ip, port) => {
+                                            LocalEndpoint::Ipv6Port(ip, port) => {
                                                 SocketAddr::new(IpAddr::V6(*ip), *port)
                                             }
                                         },
@@ -182,10 +182,10 @@ impl PreConnection {
                                 if let Some(cert_path) = &files.certificate_path {
                                     let local_endpoint = match &self.local_endpoint {
                                         Some(endpoint) => match endpoint {
-                                            Ipv4Port(ip, port) => {
+                                            LocalEndpoint::Ipv4Port(ip, port) => {
                                                 SocketAddr::new(IpAddr::V4(*ip), *port)
                                             }
-                                            Ipv6Port(ip, port) => {
+                                            LocalEndpoint::Ipv6Port(ip, port) => {
                                                 SocketAddr::new(IpAddr::V6(*ip), *port)
                                             }
                                         },
@@ -218,7 +218,74 @@ impl PreConnection {
         conn
     }
 
-    //pub async fn listen(&mut self) -> Option<Listener> {}
+    pub async fn listen(&mut self) -> Option<Listener> {
+        let candidates = self.gather_candidates(CallerType::Server);
+        let mut candidate_listeners = Vec::new();
+
+        let local_endpoint = match &self.local_endpoint.as_ref().unwrap() {
+            LocalEndpoint::Ipv4Port(ip, port) => SocketAddr::new(IpAddr::V4(*ip), *port),
+            LocalEndpoint::Ipv6Port(ip, port) => SocketAddr::new(IpAddr::V6(*ip), *port),
+        };
+
+        for candidate in candidates {
+            if candidate == "tcp".to_string() {
+                candidate_listeners.push(CandidateConnection::TcpListener(TcpListenerCandidate {
+                    addr: local_endpoint,
+                }))
+            }
+            if candidate == "tls_tcp".to_string() {
+                let cert_path = &self
+                    .security_parameters
+                    .as_ref()
+                    .unwrap()
+                    .certificate_path
+                    .as_ref()
+                    .unwrap();
+                let key_path = &self
+                    .security_parameters
+                    .as_ref()
+                    .unwrap()
+                    .private_key_path
+                    .as_ref()
+                    .unwrap();
+                candidate_listeners.push(CandidateConnection::TlsTcpListener(
+                    TlsTcpListenerCandidate {
+                        addr: local_endpoint,
+                        cert_path: cert_path.to_path_buf(),
+                        key_path: key_path.to_path_buf(),
+                    },
+                ))
+            }
+            if candidate == "quic".to_string() {
+                let cert_path = &self
+                    .security_parameters
+                    .as_ref()
+                    .unwrap()
+                    .certificate_path
+                    .as_ref()
+                    .unwrap();
+                let key_path = &self
+                    .security_parameters
+                    .as_ref()
+                    .unwrap()
+                    .private_key_path
+                    .as_ref()
+                    .unwrap();
+                let host = match dns_lookup::lookup_addr(&local_endpoint.ip()) {
+                    Ok(v) => v,
+                    Err(e) => continue,
+                };
+                candidate_listeners.push(CandidateConnection::QuicListener(QuicListenerCandidate {
+                    addr: local_endpoint,
+                    cert_path: cert_path.to_path_buf(),
+                    key_path: key_path.to_path_buf(),
+                    hostname: host,
+                }))
+            }
+        }
+
+        None
+    }
 
     fn gather_candidates(&mut self, caller_type: CallerType) -> Vec<String> {
         let mut protocols = HashMap::new();
@@ -376,6 +443,9 @@ enum CandidateConnection {
     Tcp(TcpCandidate),
     TlsTcp(TlsTcpCandidate),
     Quic(QuicCandidate),
+    TcpListener(TcpListenerCandidate),
+    TlsTcpListener(TlsTcpListenerCandidate),
+    QuicListener(QuicListenerCandidate),
 }
 
 struct TcpCandidate {
@@ -392,6 +462,23 @@ struct QuicCandidate {
     local_endpoint: SocketAddr,
     host: String,
     cert_path: PathBuf,
+}
+
+struct TcpListenerCandidate {
+    addr: SocketAddr,
+}
+
+struct TlsTcpListenerCandidate {
+    addr: SocketAddr,
+    cert_path: PathBuf,
+    key_path: PathBuf,
+}
+
+struct QuicListenerCandidate {
+    addr: SocketAddr,
+    cert_path: PathBuf,
+    key_path: PathBuf,
+    hostname: String,
 }
 
 enum CallerType {
