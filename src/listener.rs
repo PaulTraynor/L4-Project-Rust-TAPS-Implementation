@@ -12,6 +12,7 @@ use std::io;
 use std::io::BufReader;
 use std::net::*;
 use std::path::Path;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -92,15 +93,11 @@ pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
 impl QuicListener {
     pub async fn listener(
         addr: SocketAddr,
-        pre_connection: PreConnection,
+        cert_path: PathBuf,
+        key_path: PathBuf,
         hostname: String,
     ) -> Option<QuicListener> {
-        let security_params = pre_connection.security_parameters.unwrap();
-        let (cert_path, key_path) = (
-            &security_params.certificate_path.unwrap(),
-            &security_params.private_key_path.unwrap(),
-        );
-        let key = fs::read(key_path).expect("failed to read private key");
+        let key = fs::read(&key_path).expect("failed to read private key");
         let key = if key_path.extension().map_or(false, |x| x == "der") {
             rustls::PrivateKey(key)
         } else {
@@ -121,7 +118,7 @@ impl QuicListener {
             }
         };
 
-        let cert_chain = fs::read(cert_path).expect("failed to read certificate chain");
+        let cert_chain = fs::read(&cert_path).expect("failed to read certificate chain");
         let cert_chain = if cert_path.extension().map_or(false, |x| x == "der") {
             vec![rustls::Certificate(cert_chain)]
         } else {
