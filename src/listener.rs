@@ -1,46 +1,84 @@
 use crate::connection::*;
-use crate::error::Error;
 use crate::pre_connection::PreConnection;
-use futures_util::{StreamExt, TryFutureExt};
+use async_stream::stream;
+use async_trait::async_trait;
+use futures_util::pin_mut;
+use futures_util::StreamExt;
 use log::*;
-use mio_quic;
-use quiche;
-use ring::rand::*;
 use rustls_pemfile::{certs, rsa_private_keys};
-use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read, Write};
+use std::io::BufReader;
 use std::net::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::io::{copy, sink, split, AsyncWriteExt};
+use std::task::{Context, Poll};
 use tokio::net::TcpListener;
+use tokio::runtime::Handle;
+use tokio::task;
 use tokio_rustls::rustls::{self, Certificate, PrivateKey};
 use tokio_rustls::TlsAcceptor;
+use tokio_stream::Stream;
 
 pub struct Listener {
-    //listner - something implementing Stream trait
-// so can return a stream of Connection objects
+    tcp_listener: Option<TapsTcpListener>,
+    tls_tcp_listener: Option<TlsTcpListener>,
+    quic_listener: Option<QuicListener>,
 }
 
 impl Listener {
-    //fn next_connection -> Connection {
-    //listener.poll_next()...etc.
-    //}
+    async fn next_connection(&mut self) -> Option<Connection> {
+        if let Some(listener) = &mut self.tcp_listener {
+            if let Some(a) = listener.next().await {
+                return Some(Connection {
+                    protocol_impl: Box::new(a),
+                });
+            }
+        } else if let Some(listener) = &mut self.tls_tcp_listener {
+            if let Some(a) = listener.next().await {
+                return Some(Connection {
+                    protocol_impl: Box::new(a),
+                });
+            }
+        } else if let Some(listener) = &mut self.quic_listener {
+            if let Some(a) = listener.next().await {
+                return Some(Connection {
+                    protocol_impl: Box::new(a),
+                });
+            }
+        }
+        None
+    }
 }
 
-pub struct TapsTcpListener {}
+pub struct TapsTcpListener {
+    listener: TcpListener,
+}
 
 impl TapsTcpListener {
     async fn listener(addr: SocketAddr) -> TcpListener {
         TcpListener::bind(addr).await.unwrap()
     }
 
-    async fn accept_connection(listener: TcpListener) -> TcpConnection {
-        let (tcp_stream, addr) = listener.accept().await.unwrap();
-        TcpConnection { stream: tcp_stream }
+    async fn accept_connection(&self) -> Option<TcpConnection> {
+        let (tcp_stream, addr) = self.listener.accept().await.unwrap();
+        Some(TcpConnection { stream: tcp_stream })
+    }
+}
+
+impl Stream for TapsTcpListener {
+    type Item = TcpConnection;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(tcp_conn) = task::block_in_place(move || {
+            Handle::current().block_on(async move { self.accept_connection().await })
+        }) {
+            Poll::Ready(Some(tcp_conn))
+        } else {
+            Poll::Pending
+        }
     }
 }
 
@@ -118,7 +156,7 @@ impl QuicListener {
         })
     }
 
-    pub async fn recv_connection(&mut self) -> Option<QuicConnection> {
+    pub async fn accept_connection(&mut self) -> Option<QuicConnection> {
         if let Some(conn) = self.incoming.next().await {
             let quinn::NewConnection {
                 connection,
@@ -150,6 +188,20 @@ impl QuicListener {
             }
         } else {
             return None;
+        }
+    }
+}
+
+impl Stream for QuicListener {
+    type Item = QuicConnection;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(quic_conn) = task::block_in_place(move || {
+            Handle::current().block_on(async move { self.accept_connection().await })
+        }) {
+            Poll::Ready(Some(quic_conn))
+        } else {
+            Poll::Pending
         }
     }
 }
@@ -192,14 +244,28 @@ impl TlsTcpListener {
         }
     }
 
-    pub async fn accept_connection(server: TlsTcpListener) -> TlsTcpConnection {
-        let (stream, peer_addr) = server.listener.accept().await.unwrap();
-        let acceptor = server.acceptor.clone();
+    pub async fn accept_connection(&self) -> Option<TlsTcpConnection> {
+        let (stream, peer_addr) = self.listener.accept().await.unwrap();
+        let acceptor = self.acceptor.clone();
 
         let stream = acceptor.accept(stream).await.unwrap();
 
-        TlsTcpConnection {
+        Some(TlsTcpConnection {
             tls_conn: TlsTcpConn::Server(stream),
+        })
+    }
+}
+
+impl Stream for TlsTcpListener {
+    type Item = TlsTcpConnection;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(tls_tcp_conn) = task::block_in_place(move || {
+            Handle::current().block_on(async move { self.accept_connection().await })
+        }) {
+            Poll::Ready(Some(tls_tcp_conn))
+        } else {
+            Poll::Pending
         }
     }
 }

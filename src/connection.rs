@@ -28,8 +28,8 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn send(&mut self, buffer: &[u8]) {
-        self.protocol_impl.send(buffer);
+    pub async fn send(&mut self, buffer: &[u8]) {
+        self.protocol_impl.send(buffer).await;
     }
 
     pub fn recv(&mut self) {

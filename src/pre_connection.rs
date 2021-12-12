@@ -2,11 +2,13 @@ use crate::connection::*;
 use crate::endpoint;
 use crate::endpoint::LocalEndpoint::{Ipv4Port, Ipv6Port};
 use crate::endpoint::RemoteEndpoint;
+use crate::listener::*;
 use crate::transport_properties;
 use crate::transport_properties::Preference::*;
 use crate::transport_properties::SelectionProperty::*;
 use dns_lookup::lookup_host;
 use std::collections::HashMap;
+use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -51,7 +53,7 @@ impl PreConnection {
         match &self.remote_endpoint {
             Some(v) => match v {
                 RemoteEndpoint::HostnamePort(host, port) => {
-                    let dns_ips = match dns_lookup::lookup_host(&host) {
+                    let dns_ips = match get_ips(&host) {
                         Ok(v) => v,
                         Err(e) => panic!("failed to lookup host"),
                     };
@@ -208,7 +210,7 @@ impl PreConnection {
             None => panic!("no remote endpoint added"),
         }
 
-        let conn = match race_connections(candidate_connections).await {
+        let conn = match race_connections(candidate_connections, CallerType::Client).await {
             Some(conn) => Some(conn),
             None => return None,
         };
@@ -216,7 +218,7 @@ impl PreConnection {
         conn
     }
 
-    //fn listen(&self) -> Listener {}
+    //pub async fn listen(&mut self) -> Option<Listener> {}
 
     fn gather_candidates(&mut self, caller_type: CallerType) -> Vec<String> {
         let mut protocols = HashMap::new();
@@ -370,12 +372,6 @@ struct PreferenceLevel {
     preference: u32,
 }
 
-enum CandidateProtocol {
-    Tcp,
-    TlsTcp,
-    Quic,
-}
-
 enum CandidateConnection {
     Tcp(TcpCandidate),
     TlsTcp(TlsTcpCandidate),
@@ -403,7 +399,10 @@ enum CallerType {
     Server,
 }
 
-async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Option<Connection> {
+async fn race_connections(
+    candidate_connections: Vec<CandidateConnection>,
+    caller_type: CallerType,
+) -> Option<Connection> {
     println!("{}", candidate_connections.len());
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
@@ -432,16 +431,14 @@ async fn race_connections(candidate_connections: Vec<CandidateConnection>) -> Op
                 CandidateConnection::TlsTcp(data) => {
                     let conn_dict = tls_tcp_map.clone();
                     tokio::spawn(async move {
-                        run_connection_tls_tcp(data, conn_dict, found);
-                    })
-                    .await;
+                        run_connection_tls_tcp(data, conn_dict, found).await;
+                    });
                 }
                 CandidateConnection::Quic(data) => {
                     let conn_dict = quic_map.clone();
                     tokio::spawn(async move {
-                        run_connection_quic(data, conn_dict, found);
-                    })
-                    .await;
+                        run_connection_quic(data, conn_dict, found).await;
+                    });
                 }
             }
             sleep(Duration::from_millis(200)).await;
@@ -530,9 +527,9 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
     }
 }
 
-pub fn get_ips(hostname: &str) -> Vec<std::net::IpAddr> {
+pub fn get_ips(hostname: &str) -> io::Result<Vec<IpAddr>> {
     //let ips: Vec<std::net::IpAddr> =
-    lookup_host(hostname).unwrap()
+    lookup_host(hostname)
     //for ip in ips {
     //  println!("{}", ip);
     //}

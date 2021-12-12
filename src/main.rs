@@ -46,7 +46,7 @@ async fn main() {
     match conn {
         Some(mut conn) => {
             println!("sending");
-            conn.send(data);
+            conn.send(data).await;
         }
         None => {
             println!("no conn")
