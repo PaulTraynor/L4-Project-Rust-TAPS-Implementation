@@ -195,3 +195,48 @@
 * *0.5 hours* Modified QUIC receive method to check all readable streams 
 * *2 hours* Researching and experimenting with external HTTP libraries to be used for framing HTTP requests and responses 
 * *1 hour* Added selection properties from TAPS and relevant security parameters 
+
+### 30 Nov 2021
+
+* *2 hours* Started candidate gathering 
+* *1 hour* Public API improvements
+
+### 01 Dec 2021
+
+* *0.5 hours* Meeting with supervisor
+* *2 hours* Added ordering of candidates, finished candidate gathering 
+* *1.5 hour* Stopped using split for TLS/TCP connections, using other methods instead for send/recv
+
+### 03 Dec 2021
+
+* *3 hours* Started re-implementation of QUIC using quinn 
+
+### 05 Dec 2021
+
+* *1 hour* Started default HTTP framer
+* *2 hours* Started connection racing 
+* *1.5 hours* Extended QUIC code to include accept connections on a listener
+
+## Week 11
+
+### 06 Dec 2021
+
+* *2.5 hours* Fully implemented connection racing for TCP
+
+### 07 Dec 2021
+
+* *3 hours* Implemented connection racing for TLS/TCP and QUIC
+
+### 11 Dec 2021
+
+* *2 hours* TCP connection racing tested successfully 
+* *1 hour* Modified async code to increase interleaving of tasks
+
+### 12 Dec 2021
+
+* *2.5 hours* Implemented outer Listener struct- experimented with various design options 
+* *2 hours* Returning stream of protocol listeners - implemented Stream trait on all protocols
+
+### 13 Dec 2021
+
+* *3 hours* Added listener racing for all protocols 
