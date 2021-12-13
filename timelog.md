@@ -237,6 +237,8 @@
 * *2.5 hours* Implemented outer Listener struct- experimented with various design options 
 * *2 hours* Returning stream of protocol listeners - implemented Stream trait on all protocols
 
+## Week 12
+
 ### 13 Dec 2021
 
 * *3 hours* Added listener racing for all protocols 
