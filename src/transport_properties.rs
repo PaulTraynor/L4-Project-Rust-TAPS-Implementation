@@ -35,10 +35,10 @@ pub struct SecurityParameters {
 }
 
 impl SecurityParameters {
-    pub fn new(path_1: PathBuf, path_2: PathBuf) -> SecurityParameters {
+    pub fn new(path_1: Option<PathBuf>, path_2: Option<PathBuf>) -> SecurityParameters {
         SecurityParameters {
-            certificate_path: Some(path_1),
-            private_key_path: Some(path_2),
+            certificate_path: path_1,
+            private_key_path: path_2,
         }
     }
 }

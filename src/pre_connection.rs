@@ -20,6 +20,7 @@ use tokio::time::sleep;
 type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
 type TlsTcpConnRecord = Arc<Mutex<HashMap<String, TlsTcpConnection>>>;
 type QuicConnRecord = Arc<Mutex<HashMap<String, QuicConnection>>>;
+type ListenerRecord = Arc<Mutex<HashMap<String, Listener>>>;
 type ConnFound = Arc<Mutex<bool>>;
 
 pub struct PreConnection {
@@ -229,9 +230,9 @@ impl PreConnection {
 
         for candidate in candidates {
             if candidate == "tcp".to_string() {
-                candidate_listeners.push(CandidateConnection::TcpListener(TcpListenerCandidate {
+                candidate_listeners.push(CandidateListener::TcpListener(TcpListenerCandidate {
                     addr: local_endpoint,
-                }))
+                }));
             }
             if candidate == "tls_tcp".to_string() {
                 let cert_path = &self
@@ -248,13 +249,13 @@ impl PreConnection {
                     .private_key_path
                     .as_ref()
                     .unwrap();
-                candidate_listeners.push(CandidateConnection::TlsTcpListener(
+                candidate_listeners.push(CandidateListener::TlsTcpListener(
                     TlsTcpListenerCandidate {
                         addr: local_endpoint,
                         cert_path: cert_path.to_path_buf(),
                         key_path: key_path.to_path_buf(),
                     },
-                ))
+                ));
             }
             if candidate == "quic".to_string() {
                 let cert_path = &self
@@ -275,12 +276,12 @@ impl PreConnection {
                     Ok(v) => v,
                     Err(e) => continue,
                 };
-                candidate_listeners.push(CandidateConnection::QuicListener(QuicListenerCandidate {
+                candidate_listeners.push(CandidateListener::QuicListener(QuicListenerCandidate {
                     addr: local_endpoint,
                     cert_path: cert_path.to_path_buf(),
                     key_path: key_path.to_path_buf(),
                     hostname: host,
-                }))
+                }));
             }
         }
 
@@ -443,6 +444,9 @@ enum CandidateConnection {
     Tcp(TcpCandidate),
     TlsTcp(TlsTcpCandidate),
     Quic(QuicCandidate),
+}
+
+enum CandidateListener {
     TcpListener(TcpListenerCandidate),
     TlsTcpListener(TlsTcpListenerCandidate),
     QuicListener(QuicListenerCandidate),
@@ -613,6 +617,8 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
         }
     }
 }
+
+async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, found: ConnFound) {}
 
 pub fn get_ips(hostname: &str) -> io::Result<Vec<IpAddr>> {
     //let ips: Vec<std::net::IpAddr> =

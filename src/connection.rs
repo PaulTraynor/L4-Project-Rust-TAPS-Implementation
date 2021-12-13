@@ -15,7 +15,6 @@ const HTTP_REQ_STREAM_ID: u64 = 4;
 #[async_trait]
 pub trait ProtocolConnection {
     async fn send(&mut self, buffer: &[u8]);
-
     async fn recv(&mut self);
 
     async fn close(&mut self);

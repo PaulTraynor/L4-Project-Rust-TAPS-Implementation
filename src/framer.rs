@@ -5,7 +5,7 @@ pub trait Framer {
     type Message;
 
     fn from_bytes(&self, raw_bytes: &[u8]) -> Self::Message;
-    fn to_bytes<'t>(&self, message: &Self::Message) -> &'t [u8];
+    fn to_bytes<'a>(&self, message: &Self::Message) -> &'a [u8];
 }
 
 pub struct HttpRequestFramer {}
