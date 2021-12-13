@@ -211,9 +211,12 @@ impl PreConnection {
             None => panic!("no remote endpoint added"),
         }
 
-        let conn = match race_connections(candidate_connections, CallerType::Client).await {
-            Some(conn) => Some(conn),
-            None => return None,
+        let conn = match race_connections(candidate_connections).await {
+            Some(data) => match data {
+                (Some(conn), None) => Some(conn),
+                _ => None,
+            },
+            _ => None,
         };
 
         conn
@@ -230,7 +233,7 @@ impl PreConnection {
 
         for candidate in candidates {
             if candidate == "tcp".to_string() {
-                candidate_listeners.push(CandidateListener::TcpListener(TcpListenerCandidate {
+                candidate_listeners.push(CandidateConnection::TcpListener(TcpListenerCandidate {
                     addr: local_endpoint,
                 }));
             }
@@ -249,7 +252,7 @@ impl PreConnection {
                     .private_key_path
                     .as_ref()
                     .unwrap();
-                candidate_listeners.push(CandidateListener::TlsTcpListener(
+                candidate_listeners.push(CandidateConnection::TlsTcpListener(
                     TlsTcpListenerCandidate {
                         addr: local_endpoint,
                         cert_path: cert_path.to_path_buf(),
@@ -276,16 +279,25 @@ impl PreConnection {
                     Ok(v) => v,
                     Err(e) => continue,
                 };
-                candidate_listeners.push(CandidateListener::QuicListener(QuicListenerCandidate {
-                    addr: local_endpoint,
-                    cert_path: cert_path.to_path_buf(),
-                    key_path: key_path.to_path_buf(),
-                    hostname: host,
-                }));
+                candidate_listeners.push(CandidateConnection::QuicListener(
+                    QuicListenerCandidate {
+                        addr: local_endpoint,
+                        cert_path: cert_path.to_path_buf(),
+                        key_path: key_path.to_path_buf(),
+                        hostname: host,
+                    },
+                ));
             }
         }
+        let listener = match race_connections(candidate_listeners).await {
+            Some(data) => match data {
+                (None, Some(listener)) => Some(listener),
+                _ => None,
+            },
+            _ => None,
+        };
 
-        None
+        listener
     }
 
     fn gather_candidates(&mut self, caller_type: CallerType) -> Vec<String> {
@@ -444,9 +456,6 @@ enum CandidateConnection {
     Tcp(TcpCandidate),
     TlsTcp(TlsTcpCandidate),
     Quic(QuicCandidate),
-}
-
-enum CandidateListener {
     TcpListener(TcpListenerCandidate),
     TlsTcpListener(TlsTcpListenerCandidate),
     QuicListener(QuicListenerCandidate),
@@ -492,16 +501,17 @@ enum CallerType {
 
 async fn race_connections(
     candidate_connections: Vec<CandidateConnection>,
-    caller_type: CallerType,
-) -> Option<Connection> {
+) -> Option<(Option<Connection>, Option<Listener>)> {
     println!("{}", candidate_connections.len());
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let quic_map = Arc::new(Mutex::new(HashMap::new()));
+    let listener_map = Arc::new(Mutex::new(HashMap::new()));
 
     let tcp_map_clone = tcp_map.clone();
     let tls_tcp_map_clone = tls_tcp_map.clone();
     let quic_map_clone = quic_map.clone();
+    let listener_map_clone = listener_map.clone();
 
     let found = false;
     let found = Arc::new(Mutex::new(found));
@@ -531,6 +541,24 @@ async fn race_connections(
                         run_connection_quic(data, conn_dict, found).await;
                     });
                 }
+                CandidateConnection::TcpListener(data) => {
+                    let conn_dict = listener_map.clone();
+                    tokio::spawn(async move {
+                        run_listener_tcp(data, conn_dict, found).await;
+                    });
+                }
+                CandidateConnection::TlsTcpListener(data) => {
+                    let conn_dict = listener_map.clone();
+                    tokio::spawn(async move {
+                        run_listener_tls_tcp(data, conn_dict, found).await;
+                    });
+                }
+                CandidateConnection::QuicListener(data) => {
+                    let conn_dict = listener_map.clone();
+                    tokio::spawn(async move {
+                        run_listener_quic(data, conn_dict, found).await;
+                    });
+                }
             }
             sleep(Duration::from_millis(200)).await;
         }
@@ -552,23 +580,37 @@ async fn race_connections(
             let mut conn = tcp_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
             println!("returning");
-            return Some(Connection {
-                protocol_impl: Box::new(conn),
-            });
+            return Some((
+                Some(Connection {
+                    protocol_impl: Box::new(conn),
+                }),
+                None,
+            ));
         }
         if !tls_tcp_map_clone.lock().unwrap().is_empty() {
             let mut conn = tls_tcp_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
-            return Some(Connection {
-                protocol_impl: Box::new(conn),
-            });
+            return Some((
+                Some(Connection {
+                    protocol_impl: Box::new(conn),
+                }),
+                None,
+            ));
         }
         if !quic_map_clone.lock().unwrap().is_empty() {
             let mut conn = quic_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
-            return Some(Connection {
-                protocol_impl: Box::new(conn),
-            });
+            return Some((
+                Some(Connection {
+                    protocol_impl: Box::new(conn),
+                }),
+                None,
+            ));
+        }
+        if !listener_map_clone.lock().unwrap().is_empty() {
+            let mut listener = listener_map_clone.lock().unwrap();
+            let listener = listener.remove("listener").unwrap();
+            return Some((None, Some(listener)));
         } else {
             return None;
         }
@@ -618,7 +660,68 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
     }
 }
 
-async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, found: ConnFound) {}
+async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, found: ConnFound) {
+    if let Some(tcp_listener) = TapsTcpListener::listener(listener.addr).await {
+        let mut map = map.lock().unwrap();
+        let mut found = found.lock().unwrap();
+        if *found == false {
+            let tcp_listener = Listener {
+                tcp_listener: Some(TapsTcpListener {
+                    listener: tcp_listener,
+                }),
+                tls_tcp_listener: None,
+                quic_listener: None,
+            };
+            map.insert("listener".to_string(), tcp_listener);
+            *found = true;
+        }
+    }
+}
+
+async fn run_listener_tls_tcp(
+    listener: TlsTcpListenerCandidate,
+    map: ListenerRecord,
+    found: ConnFound,
+) {
+    if let Some(tls_tcp_listener) =
+        TlsTcpListener::listener(listener.addr, listener.cert_path, listener.key_path).await
+    {
+        let mut map = map.lock().unwrap();
+        let mut found = found.lock().unwrap();
+        if *found == false {
+            let tls_tcp_listener = Listener {
+                tcp_listener: None,
+                tls_tcp_listener: Some(tls_tcp_listener),
+                quic_listener: None,
+            };
+            map.insert("listener".to_string(), tls_tcp_listener);
+            *found = true;
+        }
+    }
+}
+
+async fn run_listener_quic(listener: QuicListenerCandidate, map: ListenerRecord, found: ConnFound) {
+    if let Some(quic_listener) = QuicListener::listener(
+        listener.addr,
+        listener.cert_path,
+        listener.key_path,
+        listener.hostname,
+    )
+    .await
+    {
+        let mut map = map.lock().unwrap();
+        let mut found = found.lock().unwrap();
+        if *found == false {
+            let quic_listener = Listener {
+                tcp_listener: None,
+                tls_tcp_listener: None,
+                quic_listener: Some(quic_listener),
+            };
+            map.insert("listener".to_string(), quic_listener);
+            *found = true;
+        }
+    }
+}
 
 pub fn get_ips(hostname: &str) -> io::Result<Vec<IpAddr>> {
     //let ips: Vec<std::net::IpAddr> =

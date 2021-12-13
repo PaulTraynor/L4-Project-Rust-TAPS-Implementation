@@ -24,9 +24,9 @@ use tokio_rustls::TlsAcceptor;
 use tokio_stream::Stream;
 
 pub struct Listener {
-    tcp_listener: Option<TapsTcpListener>,
-    tls_tcp_listener: Option<TlsTcpListener>,
-    quic_listener: Option<QuicListener>,
+    pub tcp_listener: Option<TapsTcpListener>,
+    pub tls_tcp_listener: Option<TlsTcpListener>,
+    pub quic_listener: Option<QuicListener>,
 }
 
 impl Listener {
@@ -55,12 +55,15 @@ impl Listener {
 }
 
 pub struct TapsTcpListener {
-    listener: TcpListener,
+    pub listener: TcpListener,
 }
 
 impl TapsTcpListener {
-    async fn listener(addr: SocketAddr) -> TcpListener {
-        TcpListener::bind(addr).await.unwrap()
+    pub async fn listener(addr: SocketAddr) -> Option<TcpListener> {
+        match TcpListener::bind(addr).await {
+            Ok(listener) => Some(listener),
+            Err(_) => None,
+        }
     }
 
     async fn accept_connection(&self) -> Option<TcpConnection> {
