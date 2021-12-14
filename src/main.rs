@@ -8,14 +8,13 @@ mod transport_properties;
 use crate::connection::QuicConnection;
 use crate::connection::TlsTcpConnection;
 use crate::endpoint::RemoteEndpoint;
+use crate::framer::Framer;
 use crate::pre_connection::PreConnection;
 use crate::transport_properties::{Preference, SelectionProperty};
 //use crate::framer::*;
 use crate::transport_properties::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncWriteExt};
-use trust_dns_resolver::config::*;
-use trust_dns_resolver::Resolver;
 
 #[tokio::main]
 async fn main() {
@@ -30,6 +29,27 @@ async fn main() {
     //  println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
     //}
 
+    let framer = framer::HttpRequestFramer {};
+    let request = b"GET /index.html HTTP/1.1\r\nHost: example.domain\r\n\r\n";
+    //let response = b"HTTP/1.1 200 OK\r\nConnection: Keep-Alive\r\n\r\n";
+    let parsed_request = framer.from_bytes(request);
+    if let Ok(req) = parsed_request {
+        //println!("{}", req.version);
+        let encoded = framer.to_bytes(req);
+        println!("{}", std::str::from_utf8(&encoded[..]).unwrap());
+        //assert_eq!(request, &encoded[..]);
+    }
+    //println!("{}", parsed_request.version);
+    let framer = framer::HttpResponseFramer {};
+    //let response = b"GET /index.html HTTP/1.1\r\nHost: example.domain\r\n\r\n";
+    let response = b"HTTP/1.1 200 OK\r\nConnection: Keep-Alive\r\n\r\n";
+    let parsed_request = framer.from_bytes(response);
+    if let Ok(req) = parsed_request {
+        //println!("{}", req.version);
+        let encoded = framer.to_bytes(req);
+        println!("{}", std::str::from_utf8(&encoded[..]).unwrap());
+        //assert_eq!(request, &encoded[..]);
+    }
     /***
 
     let mut t_p = transport_properties::TransportProperties::new();
