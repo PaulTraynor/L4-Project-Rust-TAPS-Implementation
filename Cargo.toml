@@ -26,3 +26,5 @@ quinn = "0.8.0"
 futures-util = { version = "0.3.11", default-features = false, features = ["io"] }
 tokio-stream = "0.1.8"
 async-stream = "0.3.2"
+httparse = "1.5.1"
+http-muncher = "0.3.2"

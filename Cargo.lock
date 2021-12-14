@@ -335,6 +335,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-muncher"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad5ef098f884f8d927426a231d14a923be1798ff0d5ad238989f4912565fb283"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
+name = "httparse"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acd94fdbe1d4ff688b67b04eee2e17bd50995534a61539e45adfefb45e5e5503"
+
+[[package]]
 name = "humantime"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -820,6 +836,8 @@ dependencies = [
  "env_logger",
  "futures-util",
  "http",
+ "http-muncher",
+ "httparse",
  "log",
  "mio 0.6.23",
  "quiche",

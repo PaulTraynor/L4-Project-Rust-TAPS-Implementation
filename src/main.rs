@@ -1,7 +1,7 @@
 mod connection;
 mod endpoint;
-//mod framer;
 mod error;
+mod framer;
 mod listener;
 mod pre_connection;
 mod transport_properties;
@@ -30,6 +30,8 @@ async fn main() {
     //  println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
     //}
 
+    /***
+
     let mut t_p = transport_properties::TransportProperties::new();
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
@@ -52,6 +54,7 @@ async fn main() {
             println!("no conn")
         }
     }
+    ***/
 
     //for ip in host {
     //  println!("{}", dns_lookup::lookup_addr(&ip).unwrap())
