@@ -13,31 +13,11 @@ use tokio_rustls::TlsConnector;
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
 #[async_trait]
-pub trait ProtocolConnection {
+pub trait Connection {
     async fn send(&mut self, buffer: &[u8]);
     async fn recv(&mut self);
 
     async fn close(&mut self);
-
-    //fn abort();
-}
-
-pub struct Connection {
-    pub protocol_impl: Box<dyn ProtocolConnection>,
-}
-
-impl Connection {
-    pub async fn send(&mut self, buffer: &[u8]) {
-        self.protocol_impl.send(buffer).await;
-    }
-
-    pub fn recv(&mut self) {
-        self.protocol_impl.recv();
-    }
-
-    pub fn close(&mut self) {
-        self.protocol_impl.close();
-    }
 }
 
 pub struct TcpConnection {
@@ -54,7 +34,7 @@ impl TcpConnection {
 }
 
 #[async_trait]
-impl ProtocolConnection for TcpConnection {
+impl Connection for TcpConnection {
     async fn send(&mut self, buffer: &[u8]) {
         self.stream.write(buffer).await.unwrap();
     }
@@ -128,7 +108,7 @@ impl QuicConnection {
     }
 }
 #[async_trait]
-impl ProtocolConnection for QuicConnection {
+impl Connection for QuicConnection {
     async fn send(&mut self, buffer: &[u8]) {
         self.send.write_all(buffer).await;
     }
@@ -184,7 +164,7 @@ impl TlsTcpConnection {
 }
 
 #[async_trait]
-impl ProtocolConnection for TlsTcpConnection {
+impl Connection for TlsTcpConnection {
     async fn send(&mut self, buf: &[u8]) {
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
