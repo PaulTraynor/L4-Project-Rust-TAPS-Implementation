@@ -16,7 +16,6 @@ const HTTP_REQ_STREAM_ID: u64 = 4;
 pub trait Connection {
     async fn send(&mut self, buffer: &[u8]);
     async fn recv(&mut self);
-
     async fn close(&mut self);
 }
 

@@ -30,24 +30,18 @@ pub struct Listener {
 }
 
 impl Listener {
-    async fn next_connection(&mut self) -> Option<Connection> {
+    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
         if let Some(listener) = &mut self.tcp_listener {
             if let Some(a) = listener.next().await {
-                return Some(Connection {
-                    protocol_impl: Box::new(a),
-                });
+                return Some(Box::new(a));
             }
         } else if let Some(listener) = &mut self.tls_tcp_listener {
             if let Some(a) = listener.next().await {
-                return Some(Connection {
-                    protocol_impl: Box::new(a),
-                });
+                return Some(Box::new(a));
             }
         } else if let Some(listener) = &mut self.quic_listener {
             if let Some(a) = listener.next().await {
-                return Some(Connection {
-                    protocol_impl: Box::new(a),
-                });
+                return Some(Box::new(a));
             }
         }
         None

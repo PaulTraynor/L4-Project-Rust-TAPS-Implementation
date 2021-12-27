@@ -1,3 +1,4 @@
+use crate::connection::Connection;
 use crate::connection::*;
 use crate::endpoint;
 use crate::endpoint::LocalEndpoint;
@@ -45,7 +46,7 @@ impl PreConnection {
         }
     }
 
-    pub async fn initiate(&mut self) -> Option<Connection> {
+    pub async fn initiate(&mut self) -> Option<Box<dyn Connection>> {
         let mut candidate_connections = Vec::new();
 
         // candidate gathering...
@@ -210,16 +211,15 @@ impl PreConnection {
             },
             None => panic!("no remote endpoint added"),
         }
-
         let conn = match race_connections(candidate_connections).await {
-            Some(data) => match data {
-                (Some(conn), None) => Some(conn),
-                _ => None,
-            },
+            (Some(conn), None) => Some(conn),
             _ => None,
         };
 
         conn
+
+        //let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        //Some(TcpConnection::connect(addr).await.unwrap())
     }
 
     pub async fn listen(&mut self) -> Option<Listener> {
@@ -290,10 +290,7 @@ impl PreConnection {
             }
         }
         let listener = match race_connections(candidate_listeners).await {
-            Some(data) => match data {
-                (None, Some(listener)) => Some(listener),
-                _ => None,
-            },
+            (None, Some(listener)) => Some(listener),
             _ => None,
         };
 
@@ -501,7 +498,7 @@ enum CallerType {
 
 async fn race_connections(
     candidate_connections: Vec<CandidateConnection>,
-) -> Option<(Option<Connection>, Option<Listener>)> {
+) -> (Option<Box<dyn Connection>>, Option<Listener>) {
     println!("{}", candidate_connections.len());
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
@@ -580,42 +577,24 @@ async fn race_connections(
             let mut conn = tcp_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
             println!("returning");
-            return Some((
-                Some(Connection {
-                    protocol_impl: Box::new(conn),
-                }),
-                None,
-            ));
-        }
-        if !tls_tcp_map_clone.lock().unwrap().is_empty() {
+            return (Some(Box::new(conn)), None);
+        } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
             let mut conn = tls_tcp_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
-            return Some((
-                Some(Connection {
-                    protocol_impl: Box::new(conn),
-                }),
-                None,
-            ));
-        }
-        if !quic_map_clone.lock().unwrap().is_empty() {
+            return (Some(Box::new(conn)), None);
+        } else if !quic_map_clone.lock().unwrap().is_empty() {
             let mut conn = quic_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
-            return Some((
-                Some(Connection {
-                    protocol_impl: Box::new(conn),
-                }),
-                None,
-            ));
-        }
-        if !listener_map_clone.lock().unwrap().is_empty() {
+            return (Some(Box::new(conn)), None);
+        } else if !listener_map_clone.lock().unwrap().is_empty() {
             let mut listener = listener_map_clone.lock().unwrap();
             let listener = listener.remove("listener").unwrap();
-            return Some((None, Some(listener)));
+            return (None, Some(listener));
         } else {
-            return None;
+            return (None, None);
         }
     } else {
-        return None;
+        return (None, None);
     }
 }
 

@@ -5,7 +5,9 @@ mod framer;
 mod listener;
 mod pre_connection;
 mod transport_properties;
+use crate::connection::Connection;
 use crate::connection::QuicConnection;
+use crate::connection::TcpConnection;
 use crate::connection::TlsTcpConnection;
 use crate::endpoint::RemoteEndpoint;
 use crate::framer::Framer;
@@ -15,6 +17,7 @@ use crate::transport_properties::{Preference, SelectionProperty};
 use crate::transport_properties::*;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncWriteExt};
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +32,7 @@ async fn main() {
     //  println!("{}, {:?}", resp, resolver.reverse_lookup(resp));
     //}
 
+    /***
     let framer = framer::HttpRequestFramer {};
     let request = b"GET /index.html HTTP/1.1\r\nHost: example.domain\r\n\r\n";
     //let response = b"HTTP/1.1 200 OK\r\nConnection: Keep-Alive\r\n\r\n";
@@ -50,7 +54,37 @@ async fn main() {
         println!("{}", std::str::from_utf8(&encoded[..]).unwrap());
         //assert_eq!(request, &encoded[..]);
     }
+    ***/
+
     /***
+
+    let (tx, mut rx) = mpsc::channel(32);
+    let tx2 = tx.clone();
+
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+    let conn = Some(TcpConnection::connect(addr).await.unwrap());
+
+    let conn_2 = Some(
+        TlsTcpConnection::connect(addr, "goole.vom".to_string())
+            .await
+            .unwrap(),
+    );
+
+    tokio::spawn(async move {
+        tx.send(conn).await;
+    });
+
+    tokio::spawn(async move {
+        tx2.send(conn_2).await;
+    });
+
+    while let Some(message) = rx.recv().await {
+        println!("GOT");
+    }
+    ***/
+
+    let (tx, mut rx) = mpsc::channel::<Box<dyn Connection>>(32);
+    let tx2 = tx.clone();
 
     let mut t_p = transport_properties::TransportProperties::new();
 
@@ -74,8 +108,6 @@ async fn main() {
             println!("no conn")
         }
     }
-    ***/
-
     //for ip in host {
     //  println!("{}", dns_lookup::lookup_addr(&ip).unwrap())
     //}
