@@ -23,29 +23,10 @@ use tokio_rustls::rustls::{self, Certificate, PrivateKey};
 use tokio_rustls::TlsAcceptor;
 use tokio_stream::Stream;
 
-pub struct Listener {
-    pub tcp_listener: Option<TapsTcpListener>,
-    pub tls_tcp_listener: Option<TlsTcpListener>,
-    pub quic_listener: Option<QuicListener>,
-}
-
-impl Listener {
-    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
-        if let Some(listener) = &mut self.tcp_listener {
-            if let Some(a) = listener.next().await {
-                return Some(Box::new(a));
-            }
-        } else if let Some(listener) = &mut self.tls_tcp_listener {
-            if let Some(a) = listener.next().await {
-                return Some(Box::new(a));
-            }
-        } else if let Some(listener) = &mut self.quic_listener {
-            if let Some(a) = listener.next().await {
-                return Some(Box::new(a));
-            }
-        }
-        None
-    }
+#[async_trait]
+pub trait Listener {
+    //type Connection;
+    async fn next_connection(&mut self) -> Option<Box<dyn Connection>>;
 }
 
 pub struct TapsTcpListener {
@@ -76,6 +57,17 @@ impl Stream for TapsTcpListener {
             Poll::Ready(Some(tcp_conn))
         } else {
             Poll::Pending
+        }
+    }
+}
+
+#[async_trait]
+impl Listener for TapsTcpListener {
+    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+        if let Some(conn) = self.next().await {
+            Some(Box::new(conn))
+        } else {
+            None
         }
     }
 }
@@ -200,6 +192,17 @@ impl Stream for QuicListener {
     }
 }
 
+#[async_trait]
+impl Listener for QuicListener {
+    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+        if let Some(conn) = self.next().await {
+            Some(Box::new(conn))
+        } else {
+            None
+        }
+    }
+}
+
 fn load_certs(path: &Path) -> io::Result<Vec<Certificate>> {
     certs(&mut BufReader::new(File::open(path)?))
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid cert"))
@@ -264,6 +267,17 @@ impl Stream for TlsTcpListener {
             Poll::Ready(Some(tls_tcp_conn))
         } else {
             Poll::Pending
+        }
+    }
+}
+
+#[async_trait]
+impl Listener for TlsTcpListener {
+    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+        if let Some(conn) = self.next().await {
+            Some(Box::new(conn))
+        } else {
+            None
         }
     }
 }

@@ -5,9 +5,11 @@ use std::io;
 use std::net::SocketAddr;
 use std::str;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{fs, path::PathBuf};
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::time::sleep;
 use tokio_rustls::rustls::{self, OwnedTrustAnchor};
 use tokio_rustls::TlsConnector;
 
@@ -40,9 +42,9 @@ impl Connection for TcpConnection {
     }
 
     async fn recv(&mut self) {
-        let mut buffer: [u8; 1024] = [0; 1024];
+        let mut buffer: [u8; 2000] = [0; 2000];
         self.stream.read(&mut buffer).await.unwrap();
-        //println!("{:?}", str::from_utf8(&buffer).unwrap());
+        println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
     async fn close(&mut self) {
@@ -178,9 +180,12 @@ impl Connection for TlsTcpConnection {
     }
 
     async fn recv(&mut self) {
-        let mut buffer: [u8; 2000] = [0; 2000];
+        let mut buffer: [u8; 10000] = [0; 10000];
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
+                conn.read(&mut buffer).await;
+                println!("{:?}", str::from_utf8(&buffer).unwrap());
+                sleep(Duration::from_millis(30)).await;
                 conn.read(&mut buffer).await;
                 println!("{:?}", str::from_utf8(&buffer).unwrap());
             }

@@ -21,7 +21,7 @@ use tokio::time::sleep;
 type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
 type TlsTcpConnRecord = Arc<Mutex<HashMap<String, TlsTcpConnection>>>;
 type QuicConnRecord = Arc<Mutex<HashMap<String, QuicConnection>>>;
-type ListenerRecord = Arc<Mutex<HashMap<String, Listener>>>;
+type ListenerRecord = Arc<Mutex<HashMap<String, Box<dyn Listener>>>>;
 type ConnFound = Arc<Mutex<bool>>;
 
 pub struct PreConnection {
@@ -224,7 +224,7 @@ impl PreConnection {
         //Some(TcpConnection::connect(addr).await.unwrap())
     }
 
-    pub async fn listen(&mut self) -> Option<Listener> {
+    pub async fn listen(&mut self) -> Option<Box<dyn Listener>> {
         let candidates = self.gather_candidates(CallerType::Server);
         let mut candidate_listeners = Vec::new();
 
@@ -500,7 +500,7 @@ enum CallerType {
 
 async fn race_connections(
     candidate_connections: Vec<CandidateConnection>,
-) -> (Option<Box<dyn Connection>>, Option<Listener>) {
+) -> (Option<Box<dyn Connection>>, Option<Box<dyn Listener>>) {
     println!("{}", candidate_connections.len());
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
@@ -650,13 +650,9 @@ async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, f
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            let tcp_listener = Listener {
-                tcp_listener: Some(TapsTcpListener {
-                    listener: tcp_listener,
-                }),
-                tls_tcp_listener: None,
-                quic_listener: None,
-            };
+            let tcp_listener = Box::new(TapsTcpListener {
+                listener: tcp_listener,
+            });
             map.insert("listener".to_string(), tcp_listener);
             *found = true;
         }
@@ -674,12 +670,7 @@ async fn run_listener_tls_tcp(
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            let tls_tcp_listener = Listener {
-                tcp_listener: None,
-                tls_tcp_listener: Some(tls_tcp_listener),
-                quic_listener: None,
-            };
-            map.insert("listener".to_string(), tls_tcp_listener);
+            map.insert("listener".to_string(), Box::new(tls_tcp_listener));
             *found = true;
         }
     }
@@ -697,12 +688,7 @@ async fn run_listener_quic(listener: QuicListenerCandidate, map: ListenerRecord,
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            let quic_listener = Listener {
-                tcp_listener: None,
-                tls_tcp_listener: None,
-                quic_listener: Some(quic_listener),
-            };
-            map.insert("listener".to_string(), quic_listener);
+            map.insert("listener".to_string(), Box::new(quic_listener));
             *found = true;
         }
     }

@@ -11,6 +11,7 @@ use crate::connection::TcpConnection;
 use crate::connection::TlsTcpConnection;
 use crate::endpoint::RemoteEndpoint;
 use crate::framer::Framer;
+use crate::listener::Listener;
 use crate::pre_connection::PreConnection;
 use crate::transport_properties::{Preference, SelectionProperty};
 //use crate::framer::*;
@@ -56,6 +57,9 @@ async fn main() {
     }
     ***/
 
+    let (tx, mut rx) = mpsc::channel::<Listener>(32);
+    let tx2 = tx.clone();
+
     /***
 
     let (tx, mut rx) = mpsc::channel(32);
@@ -82,7 +86,6 @@ async fn main() {
         println!("GOT");
     }
     ***/
-
     let (tx, mut rx) = mpsc::channel::<Box<dyn Connection>>(32);
     let tx2 = tx.clone();
 
@@ -91,10 +94,10 @@ async fn main() {
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
 
-    let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 443);
+    let r_e = RemoteEndpoint::HostnamePort("www.csperkins.org".to_string(), 80);
     let mut p_c = PreConnection::new(None, Some(r_e), t_p, None);
 
-    let data = b"GET / HTTP/1.1\r\nHost: www.google.co.uk\r\n\r\n";
+    let data = b"GET / HTTP/1.1\r\nHost: www.csperkins.org\r\n\r\n";
 
     let mut conn = p_c.initiate().await;
     //conn.send(&data);
