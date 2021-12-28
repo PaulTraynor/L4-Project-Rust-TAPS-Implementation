@@ -21,7 +21,9 @@ use tokio::time::sleep;
 type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
 type TlsTcpConnRecord = Arc<Mutex<HashMap<String, TlsTcpConnection>>>;
 type QuicConnRecord = Arc<Mutex<HashMap<String, QuicConnection>>>;
-type ListenerRecord = Arc<Mutex<HashMap<String, Box<dyn Listener>>>>;
+type TcpListenerRecord = Arc<Mutex<HashMap<String, TapsTcpListener>>>;
+type TlsTcpListenerRecord = Arc<Mutex<HashMap<String, TlsTcpListener>>>;
+type QuicListenerRecord = Arc<Mutex<HashMap<String, QuicListener>>>;
 type ConnFound = Arc<Mutex<bool>>;
 
 pub struct PreConnection {
@@ -505,12 +507,16 @@ async fn race_connections(
     let tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
     let quic_map = Arc::new(Mutex::new(HashMap::new()));
-    let listener_map = Arc::new(Mutex::new(HashMap::new()));
+    let tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
+    let tls_tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
+    let quic_listener_map = Arc::new(Mutex::new(HashMap::new()));
 
     let tcp_map_clone = tcp_map.clone();
     let tls_tcp_map_clone = tls_tcp_map.clone();
     let quic_map_clone = quic_map.clone();
-    let listener_map_clone = listener_map.clone();
+    let tcp_listener_map_clone = tcp_listener_map.clone();
+    let tls_tcp_listener_map_clone = tls_tcp_listener_map.clone();
+    let quic_listener_map_clone = quic_listener_map.clone();
 
     let found = false;
     let found = Arc::new(Mutex::new(found));
@@ -542,19 +548,19 @@ async fn race_connections(
                     });
                 }
                 CandidateConnection::TcpListener(data) => {
-                    let conn_dict = listener_map.clone();
+                    let conn_dict = tcp_listener_map.clone();
                     tokio::spawn(async move {
                         run_listener_tcp(data, conn_dict, found).await;
                     });
                 }
                 CandidateConnection::TlsTcpListener(data) => {
-                    let conn_dict = listener_map.clone();
+                    let conn_dict = tls_tcp_listener_map.clone();
                     tokio::spawn(async move {
                         run_listener_tls_tcp(data, conn_dict, found).await;
                     });
                 }
                 CandidateConnection::QuicListener(data) => {
-                    let conn_dict = listener_map.clone();
+                    let conn_dict = quic_listener_map.clone();
                     tokio::spawn(async move {
                         run_listener_quic(data, conn_dict, found).await;
                     });
@@ -589,10 +595,18 @@ async fn race_connections(
             let mut conn = quic_map_clone.lock().unwrap();
             let conn = conn.remove("conn").unwrap();
             return (Some(Box::new(conn)), None);
-        } else if !listener_map_clone.lock().unwrap().is_empty() {
-            let mut listener = listener_map_clone.lock().unwrap();
+        } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
+            let mut listener = tcp_listener_map_clone.lock().unwrap();
             let listener = listener.remove("listener").unwrap();
-            return (None, Some(listener));
+            return (None, Some(Box::new(listener)));
+        } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
+            let mut listener = tls_tcp_listener_map_clone.lock().unwrap();
+            let listener = listener.remove("listener").unwrap();
+            return (None, Some(Box::new(listener)));
+        } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
+            let mut listener = quic_listener_map_clone.lock().unwrap();
+            let listener = listener.remove("listener").unwrap();
+            return (None, Some(Box::new(listener)));
         } else {
             return (None, None);
         }
@@ -645,14 +659,18 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
     }
 }
 
-async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, found: ConnFound) {
+async fn run_listener_tcp(
+    listener: TcpListenerCandidate,
+    map: TcpListenerRecord,
+    found: ConnFound,
+) {
     if let Some(tcp_listener) = TapsTcpListener::listener(listener.addr).await {
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            let tcp_listener = Box::new(TapsTcpListener {
+            let tcp_listener = TapsTcpListener {
                 listener: tcp_listener,
-            });
+            };
             map.insert("listener".to_string(), tcp_listener);
             *found = true;
         }
@@ -661,7 +679,7 @@ async fn run_listener_tcp(listener: TcpListenerCandidate, map: ListenerRecord, f
 
 async fn run_listener_tls_tcp(
     listener: TlsTcpListenerCandidate,
-    map: ListenerRecord,
+    map: TlsTcpListenerRecord,
     found: ConnFound,
 ) {
     if let Some(tls_tcp_listener) =
@@ -670,13 +688,17 @@ async fn run_listener_tls_tcp(
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            map.insert("listener".to_string(), Box::new(tls_tcp_listener));
+            map.insert("listener".to_string(), tls_tcp_listener);
             *found = true;
         }
     }
 }
 
-async fn run_listener_quic(listener: QuicListenerCandidate, map: ListenerRecord, found: ConnFound) {
+async fn run_listener_quic(
+    listener: QuicListenerCandidate,
+    map: QuicListenerRecord,
+    found: ConnFound,
+) {
     if let Some(quic_listener) = QuicListener::listener(
         listener.addr,
         listener.cert_path,
@@ -688,7 +710,7 @@ async fn run_listener_quic(listener: QuicListenerCandidate, map: ListenerRecord,
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            map.insert("listener".to_string(), Box::new(quic_listener));
+            map.insert("listener".to_string(), quic_listener);
             *found = true;
         }
     }

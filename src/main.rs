@@ -57,7 +57,7 @@ async fn main() {
     }
     ***/
 
-    let (tx, mut rx) = mpsc::channel::<Listener>(32);
+    let (tx, mut rx) = mpsc::channel::<Box<dyn Listener>>(32);
     let tx2 = tx.clone();
 
     /***
