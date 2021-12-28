@@ -69,11 +69,13 @@ impl PreConnection {
                                 candidate_connections.push(tcp_candidate);
                             }
                             if candidate == "tls_tcp".to_string() {
+                                let tls_port = if *port == 80 { 443 } else { *port };
                                 let tls_candidate = CandidateConnection::TlsTcp(TlsTcpCandidate {
-                                    addr: SocketAddr::new(*ip, *port),
+                                    addr: SocketAddr::new(*ip, tls_port),
                                     host: host.to_string(),
                                 });
                                 candidate_connections.push(tls_candidate);
+                                println!("added tls candidate: {}, {}, {}", ip, port, host);
                             }
                             if candidate == "quic".to_string() {
                                 if let Some(files) = &self.security_parameters {
@@ -529,6 +531,7 @@ async fn race_connections(
                 CandidateConnection::TlsTcp(data) => {
                     let conn_dict = tls_tcp_map.clone();
                     tokio::spawn(async move {
+                        println!("run tls tcp");
                         run_connection_tls_tcp(data, conn_dict, found).await;
                     });
                 }
@@ -557,7 +560,7 @@ async fn race_connections(
                     });
                 }
             }
-            sleep(Duration::from_millis(200)).await;
+            //sleep(Duration::from_millis(30)).await;
         }
     });
 
@@ -616,10 +619,13 @@ async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnF
 }
 
 async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, found: ConnFound) {
+    println!("trying tls {}", conn.addr);
+    println!("trying tls {}", conn.host);
     if let Some(tls_tcp_conn) = TlsTcpConnection::connect(conn.addr, conn.host).await {
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
+            println!("tls won");
             map.insert("conn".to_string(), tls_tcp_conn);
             *found = true;
         }

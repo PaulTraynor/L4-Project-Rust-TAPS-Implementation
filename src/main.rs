@@ -89,12 +89,12 @@ async fn main() {
     let mut t_p = transport_properties::TransportProperties::new();
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
-    t_p.add_selection_property(SelectionProperty::Secure(Preference::Prohibit));
+    t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
 
-    let r_e = RemoteEndpoint::HostnamePort("www.sydney.edu.au".to_string(), 80);
+    let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 443);
     let mut p_c = PreConnection::new(None, Some(r_e), t_p, None);
 
-    let data = b"hello";
+    let data = b"GET / HTTP/1.1\r\nHost: www.google.co.uk\r\n\r\n";
 
     let mut conn = p_c.initiate().await;
     //conn.send(&data);
@@ -103,6 +103,7 @@ async fn main() {
         Some(mut conn) => {
             println!("sending");
             conn.send(data).await;
+            conn.recv().await;
         }
         None => {
             println!("no conn")

@@ -3,6 +3,7 @@ use quinn;
 use std::convert::TryFrom;
 use std::io;
 use std::net::SocketAddr;
+use std::str;
 use std::sync::Arc;
 use std::{fs, path::PathBuf};
 use tokio;
@@ -41,6 +42,7 @@ impl Connection for TcpConnection {
     async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
         self.stream.read(&mut buffer).await.unwrap();
+        //println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
     async fn close(&mut self) {
@@ -176,10 +178,11 @@ impl Connection for TlsTcpConnection {
     }
 
     async fn recv(&mut self) {
-        let mut buffer: [u8; 1024] = [0; 1024];
+        let mut buffer: [u8; 2000] = [0; 2000];
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
                 conn.read(&mut buffer).await;
+                println!("{:?}", str::from_utf8(&buffer).unwrap());
             }
             TlsTcpConn::Server(conn) => {
                 conn.read(&mut buffer).await;
