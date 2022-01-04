@@ -242,3 +242,27 @@
 ### 13 Dec 2021
 
 * *3 hours* Added listener racing for all protocols 
+* *2.5 hours* Debugging asynchronous code for TLS/TCP listener racing 
+* *2.5 hours*  Reading up on HTTP headers and their meanings, as well as difference between versions 
+
+### 14 Dec 2021
+
+* *5 hours* Coded framer for HTTP requests 
+* *3 hours* Coded framer for HTTP responses 
+
+### 15 Dec 2021
+
+* *0.5 hours* Meeting with supervisor
+* *3 hours* Tested and debugged HTTP framer
+* *2 hours* Designing what the re-implementation of connections and listeners as traits would look like
+
+## 27/12 - 02/01
+
+### 27 Dec 2021
+
+* *6 hours* Re-implemented connections as traits and return an implementation of this from initiate() method
+
+### 28 Dec 2021
+
+* *3 hours* Testing send() and receive() methods on TLS/TCP
+* *4 hours* Re-implemented listeners as traits 
