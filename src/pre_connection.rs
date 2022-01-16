@@ -10,7 +10,7 @@ use crate::transport_properties::SelectionProperty::*;
 use dns_lookup::lookup_host;
 use std::collections::HashMap;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -52,15 +52,17 @@ impl PreConnection {
         let mut candidate_connections = Vec::new();
 
         // candidate gathering...
-        let candidates = self.gather_candidates(CallerType::Client);
+        let mut candidates = self.gather_candidates(CallerType::Client);
+        //candidates.remove(1);
 
         match &self.remote_endpoint {
             Some(v) => match v {
                 RemoteEndpoint::HostnamePort(host, port) => {
-                    let dns_ips = match get_ips(&host) {
+                    let mut dns_ips = match get_ips(&host) {
                         Ok(v) => v,
                         Err(e) => panic!("failed to lookup host"),
                     };
+                    //dns_ips.remove(0);
                     for candidate in candidates {
                         //ips.push(SocketAddr::new(ip, *port))
                         for ip in dns_ips.iter() {
@@ -80,25 +82,35 @@ impl PreConnection {
                                 println!("added tls candidate: {}, {}, {}", ip, port, host);
                             }
                             if candidate == "quic".to_string() {
+                                let quic_port = if *port == 80 { 443 } else { *port };
                                 if let Some(files) = &self.security_parameters {
                                     if let Some(cert_path) = &files.certificate_path {
                                         let local_endpoint = match &self.local_endpoint {
                                             Some(endpoint) => match endpoint {
                                                 LocalEndpoint::Ipv4Port(ip, port) => {
-                                                    SocketAddr::new(IpAddr::V4(*ip), *port)
+                                                    SocketAddr::new(IpAddr::V4(*ip), quic_port)
                                                 }
                                                 LocalEndpoint::Ipv6Port(ip, port) => {
-                                                    SocketAddr::new(IpAddr::V6(*ip), *port)
+                                                    SocketAddr::new(IpAddr::V6(*ip), quic_port)
                                                 }
                                             },
-                                            None => SocketAddr::new(
-                                                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                                                8080,
-                                            ),
+                                            None => match ip {
+                                                IpAddr::V4(_) => SocketAddr::new(
+                                                    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                                                    0,
+                                                ),
+                                                IpAddr::V6(_) => SocketAddr::new(
+                                                    IpAddr::V6(Ipv6Addr::new(
+                                                        0, 0, 0, 0, 0, 0, 0, 0,
+                                                    )),
+                                                    0,
+                                                ),
+                                            },
                                         };
+                                        //Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
                                         let quic_candidate =
                                             CandidateConnection::Quic(QuicCandidate {
-                                                addr: SocketAddr::new(*ip, *port),
+                                                addr: SocketAddr::new(*ip, quic_port),
                                                 local_endpoint: local_endpoint,
                                                 host: host.to_string(),
                                                 cert_path: cert_path.to_path_buf(),
@@ -544,6 +556,7 @@ async fn race_connections(
                 CandidateConnection::Quic(data) => {
                     let conn_dict = quic_map.clone();
                     tokio::spawn(async move {
+                        println!("run quic");
                         run_connection_quic(data, conn_dict, found).await;
                     });
                 }
@@ -566,7 +579,7 @@ async fn race_connections(
                     });
                 }
             }
-            //sleep(Duration::from_millis(30)).await;
+            sleep(Duration::from_millis(30)).await;
         }
     });
 
@@ -653,6 +666,7 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
+            println!("quic won: {}", conn.addr);
             map.insert("conn".to_string(), quic_conn);
             *found = true;
         }

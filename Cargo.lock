@@ -843,6 +843,7 @@ dependencies = [
  "quiche",
  "quinn",
  "ring",
+ "rustls-native-certs",
  "rustls-pemfile",
  "serde",
  "serde_derive",

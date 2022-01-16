@@ -53,7 +53,7 @@ impl Connection for TcpConnection {
     }
 }
 
-pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
+pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"h3"];
 
 pub struct QuicConnection {
     pub conn: quinn::Connection,
@@ -68,14 +68,44 @@ impl QuicConnection {
         cert_path: PathBuf,
         hostname: String,
     ) -> Option<QuicConnection> {
+        println!(
+            "running quic. local address: {}, remote: {}, hostname: {}",
+            local_endpoint, addr, hostname
+        );
+        println!("here");
+        /**
         let mut roots = rustls::RootCertStore::empty();
+        println!("here");
 
         match fs::read(cert_path) {
             Ok(v) => match roots.add(&rustls::Certificate(v)) {
-                Ok(_) => {}
-                Err(_) => return None,
+                Ok(_) => {
+                    println!("ok")
+                }
+                Err(_) => {
+                    println!("error add");
+                    return None;
+                }
             },
-            Err(e) => return None,
+            Err(e) => {
+                println!("error read");
+                return None;
+            }
+        }
+        println!("here");
+        let mut client_crypto = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
+        println!("here");
+        let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
+        endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
+        **/
+        let mut roots = rustls::RootCertStore::empty();
+        for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
+        {
+            roots.add(&rustls::Certificate(cert.0)).unwrap();
         }
 
         let mut client_crypto = rustls::ClientConfig::builder()
@@ -83,42 +113,62 @@ impl QuicConnection {
             .with_root_certificates(roots)
             .with_no_client_auth();
         client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
-
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
-        match endpoint.connect(addr, &hostname) {
+        let hostname_2 = "google.com".to_string();
+
+        match endpoint.connect(addr, &hostname_2) {
             Ok(v) => match v.await {
                 Ok(new_conn) => {
+                    println!("await worked");
                     let quinn::NewConnection {
                         connection: conn, ..
                     } = new_conn;
                     match conn.open_bi().await {
                         Ok((send, recv)) => {
+                            println!("open worked");
                             return Some(QuicConnection {
                                 conn: conn,
                                 send: send,
                                 recv: recv,
-                            })
+                            });
                         }
                         Err(e) => return None,
                     }
                 }
-                Err(e) => return None,
+                Err(e) => {
+                    println!("await failed: {}", e);
+                    return None;
+                }
             },
-            Err(e) => return None,
+            Err(e) => {
+                println!("endpoint.connect failed: {}", e);
+                return None;
+            }
         }
+        println!("here");
     }
 }
 #[async_trait]
 impl Connection for QuicConnection {
     async fn send(&mut self, buffer: &[u8]) {
-        self.send.write_all(buffer).await;
+        self.send.write_all(b"");
+        self.send.write_all(buffer).await.unwrap();
+        self.send.finish().await;
     }
 
     async fn recv(&mut self) {
         let mut buffer: [u8; 1024] = [0; 1024];
         let resp = self.recv.read(&mut buffer).await;
+        println!(
+            "recieved {:?} bytes: {:?}",
+            resp,
+            str::from_utf8(&buffer).unwrap()
+        );
+        sleep(Duration::from_millis(30)).await;
+        self.recv.read(&mut buffer).await;
+        println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
     async fn close(&mut self) {

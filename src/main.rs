@@ -16,7 +16,11 @@ use crate::pre_connection::PreConnection;
 use crate::transport_properties::{Preference, SelectionProperty};
 //use crate::framer::*;
 use crate::transport_properties::*;
+use quiche::h3::NameValue;
+use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::path::Path;
 use tokio::io::{copy, split, stdin as tokio_stdin, stdout as tokio_stdout, AsyncWriteExt};
 use tokio::sync::mpsc;
 
@@ -93,18 +97,43 @@ async fn main() {
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
+    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Require));
 
-    let r_e = RemoteEndpoint::HostnamePort("www.csperkins.org".to_string(), 80);
-    let mut p_c = PreConnection::new(None, Some(r_e), t_p, None);
+    let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 80);
 
-    let data = b"GET / HTTP/1.1\r\nHost: www.csperkins.org\r\n\r\n";
+    let path = Path::new("src/cert.der");
+    let sec = transport_properties::SecurityParameters::new(Some(path.to_path_buf()), None);
+    println!("{:?}", path.to_path_buf());
 
+    let mut p_c = PreConnection::new(None, Some(r_e), t_p, Some(sec));
+
+    let data = b"GET / HTTP/1.1\r\nHost: www.google.co.uk\r\n\r\n";
+
+    let req = vec![
+        quiche::h3::Header::new(b":method", b"GET"),
+        quiche::h3::Header::new(b":scheme", "https".as_bytes()),
+        quiche::h3::Header::new(b":authority", "www.google.com".as_bytes()),
+        quiche::h3::Header::new(b":path", "/".as_bytes()),
+        quiche::h3::Header::new(b"user-agent", b"quinn"),
+    ];
+    let req_len = req
+        .iter()
+        .fold(0, |acc, h| acc + h.value().len() + h.name().len() + 32);
+
+    let mut header_block = vec![0; req_len];
+    let mut encoder = quiche::h3::qpack::Encoder::new();
+    let len = encoder.encode(&req, &mut header_block).unwrap();
+    header_block.truncate(len);
+
+    let data = &header_block;
     let mut conn = p_c.initiate().await;
+
     //conn.send(&data);
 
     match conn {
         Some(mut conn) => {
             println!("sending");
+            //conn.send(b"").await;
             conn.send(data).await;
             conn.recv().await;
         }
