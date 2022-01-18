@@ -610,6 +610,7 @@ async fn race_connections(
             return (Some(Box::new(conn)), None);
         } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
             let mut listener = tcp_listener_map_clone.lock().unwrap();
+            println!("tcp listener won");
             let listener = listener.remove("listener").unwrap();
             return (None, Some(Box::new(listener)));
         } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
@@ -618,6 +619,7 @@ async fn race_connections(
             return (None, Some(Box::new(listener)));
         } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
             let mut listener = quic_listener_map_clone.lock().unwrap();
+            println!("quic listener won");
             let listener = listener.remove("listener").unwrap();
             return (None, Some(Box::new(listener)));
         } else {
@@ -703,6 +705,7 @@ async fn run_listener_tls_tcp(
         let mut found = found.lock().unwrap();
         if *found == false {
             map.insert("listener".to_string(), tls_tcp_listener);
+            println!("tls_tcp won");
             *found = true;
         }
     }

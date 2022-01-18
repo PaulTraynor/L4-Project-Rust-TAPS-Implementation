@@ -42,7 +42,7 @@ impl Connection for TcpConnection {
     }
 
     async fn recv(&mut self) {
-        let mut buffer: [u8; 2000] = [0; 2000];
+        let mut buffer: [u8; 500] = [0; 500];
         self.stream.read(&mut buffer).await.unwrap();
         println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
@@ -73,7 +73,6 @@ impl QuicConnection {
             local_endpoint, addr, hostname
         );
         println!("here");
-        /**
         let mut roots = rustls::RootCertStore::empty();
         println!("here");
 
@@ -92,21 +91,11 @@ impl QuicConnection {
                 return None;
             }
         }
-        println!("here");
-        let mut client_crypto = rustls::ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-        client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
-        println!("here");
-        let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
-        endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
-        **/
-        let mut roots = rustls::RootCertStore::empty();
-        for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
-        {
-            roots.add(&rustls::Certificate(cert.0)).unwrap();
-        }
+        //let mut roots = rustls::RootCertStore::empty();
+        //for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
+        //{
+        //  roots.add(&rustls::Certificate(cert.0)).unwrap();
+        //}
 
         let mut client_crypto = rustls::ClientConfig::builder()
             .with_safe_defaults()
@@ -116,9 +105,7 @@ impl QuicConnection {
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
-        let hostname_2 = "google.com".to_string();
-
-        match endpoint.connect(addr, &hostname_2) {
+        match endpoint.connect(addr, &hostname) {
             Ok(v) => match v.await {
                 Ok(new_conn) => {
                     println!("await worked");

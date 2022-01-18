@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use futures_util::pin_mut;
 use futures_util::StreamExt;
 use log::*;
+use rcgen;
 use rustls_pemfile::{certs, rsa_private_keys};
 use std::fs;
 use std::fs::File;
@@ -77,7 +78,7 @@ pub struct QuicListener {
     incoming: quinn::Incoming,
 }
 
-pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"hq-29"];
+pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"h3"];
 
 impl QuicListener {
     pub async fn listener(
@@ -86,42 +87,29 @@ impl QuicListener {
         key_path: PathBuf,
         hostname: String,
     ) -> Option<QuicListener> {
-        let key = fs::read(&key_path).expect("failed to read private key");
-        let key = if key_path.extension().map_or(false, |x| x == "der") {
-            rustls::PrivateKey(key)
-        } else {
-            let pkcs8 = rustls_pemfile::pkcs8_private_keys(&mut &*key)
-                .expect("malformed PKCS #8 private key");
-            match pkcs8.into_iter().next() {
-                Some(x) => rustls::PrivateKey(x),
-                None => {
-                    let rsa = rustls_pemfile::rsa_private_keys(&mut &*key)
-                        .expect("malformed PKCS #1 private key");
-                    match rsa.into_iter().next() {
-                        Some(x) => rustls::PrivateKey(x),
-                        None => {
-                            panic!("no private keys found");
-                        }
-                    }
-                }
+        let (cert, key) = match fs::read(&cert_path).and_then(|x| Ok((x, fs::read(&key_path)?))) {
+            Ok(x) => x,
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
+                info!("generating self-signed certificate");
+                let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+                let key = cert.serialize_private_key_der();
+                let cert = cert.serialize_der().unwrap();
+                //fs::create_dir_all(&path).context("failed to create certificate directory")?;
+                fs::write(&cert_path, &cert).unwrap();
+                fs::write(&key_path, &key).unwrap();
+                (cert, key)
             }
+            Err(_) => return None,
         };
 
-        let cert_chain = fs::read(&cert_path).expect("failed to read certificate chain");
-        let cert_chain = if cert_path.extension().map_or(false, |x| x == "der") {
-            vec![rustls::Certificate(cert_chain)]
-        } else {
-            rustls_pemfile::certs(&mut &*cert_chain)
-                .expect("invalid PEM-encoded certificate")
-                .into_iter()
-                .map(rustls::Certificate)
-                .collect()
-        };
+        let key = rustls::PrivateKey(key);
+        let cert = rustls::Certificate(cert);
+        let certs = vec![cert];
 
         let mut server_crypto = rustls::ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
-            .with_single_cert(cert_chain, key)
+            .with_single_cert(certs, key)
             .unwrap();
 
         server_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
@@ -228,17 +216,17 @@ impl TlsTcpListener {
     ) -> Option<TlsTcpListener> {
         let certs = load_certs(Path::new(&cert_path)).unwrap();
         let mut keys = load_keys(Path::new(&key_path)).unwrap();
-
+        println!("here");
         let config = rustls::ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
             .with_single_cert(certs, keys.remove(0))
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))
             .unwrap();
+        println!("here");
         let acceptor = TlsAcceptor::from(Arc::new(config));
-
+        println!("here");
         let listener = TcpListener::bind(&addr).await.unwrap();
-
         Some(TlsTcpListener {
             acceptor: acceptor,
             listener: listener,

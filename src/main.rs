@@ -9,6 +9,7 @@ use crate::connection::Connection;
 use crate::connection::QuicConnection;
 use crate::connection::TcpConnection;
 use crate::connection::TlsTcpConnection;
+use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
 use crate::framer::Framer;
 use crate::listener::Listener;
@@ -97,45 +98,34 @@ async fn main() {
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
-    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Require));
+    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Prohibit));
 
-    let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 80);
+    //let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 80);
+    let l_e = LocalEndpoint::Ipv4Port(Ipv4Addr::new(127, 0, 0, 1), 8080);
 
-    let path = Path::new("src/cert.der");
-    let sec = transport_properties::SecurityParameters::new(Some(path.to_path_buf()), None);
-    println!("{:?}", path.to_path_buf());
+    let cert_path = Path::new("src/host.cert");
+    let key_path = Path::new("src/host.key");
+    let sec = transport_properties::SecurityParameters::new(
+        Some(cert_path.to_path_buf()),
+        Some(key_path.to_path_buf()),
+    );
+    //println!("{:?}", path.to_path_buf());
 
-    let mut p_c = PreConnection::new(None, Some(r_e), t_p, Some(sec));
+    let mut p_c = PreConnection::new(Some(l_e), None, t_p, Some(sec));
 
-    let data = b"GET / HTTP/1.1\r\nHost: www.google.co.uk\r\n\r\n";
-
-    let req = vec![
-        quiche::h3::Header::new(b":method", b"GET"),
-        quiche::h3::Header::new(b":scheme", "https".as_bytes()),
-        quiche::h3::Header::new(b":authority", "www.google.com".as_bytes()),
-        quiche::h3::Header::new(b":path", "/".as_bytes()),
-        quiche::h3::Header::new(b"user-agent", b"quinn"),
-    ];
-    let req_len = req
-        .iter()
-        .fold(0, |acc, h| acc + h.value().len() + h.name().len() + 32);
-
-    let mut header_block = vec![0; req_len];
-    let mut encoder = quiche::h3::qpack::Encoder::new();
-    let len = encoder.encode(&req, &mut header_block).unwrap();
-    header_block.truncate(len);
-
-    let data = &header_block;
-    let mut conn = p_c.initiate().await;
+    let mut listener = p_c.listen().await;
 
     //conn.send(&data);
 
-    match conn {
-        Some(mut conn) => {
-            println!("sending");
+    match listener {
+        Some(mut listener) => {
+            //println!("sending");
             //conn.send(b"").await;
-            conn.send(data).await;
+            println!("about to listen for connections");
+            let mut conn = listener.next_connection().await.unwrap();
+            println!("received a conn");
             conn.recv().await;
+            conn.send(b"hi to you too").await;
         }
         None => {
             println!("no conn")
