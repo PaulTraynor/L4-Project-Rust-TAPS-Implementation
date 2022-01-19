@@ -266,3 +266,11 @@
 
 * *3 hours* Testing send() and receive() methods on TLS/TCP
 * *4 hours* Re-implemented listeners as traits 
+
+## Week 13
+
+### 16 Jan 2022
+
+* *2.5 hours* Fixed problems with QUIC cryptographic handshake 
+
+## Week 14
