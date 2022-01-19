@@ -98,34 +98,35 @@ async fn main() {
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
-    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Prohibit));
+    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Require));
 
-    //let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 80);
+    let r_e = RemoteEndpoint::HostnamePort("h3.stammw.eu".to_string(), 443);
     let l_e = LocalEndpoint::Ipv4Port(Ipv4Addr::new(127, 0, 0, 1), 8080);
 
-    let cert_path = Path::new("src/host.cert");
-    let key_path = Path::new("src/host.key");
+    let cert_path = Path::new("src/my.der");
+    let key_path = Path::new("src/key.der");
     let sec = transport_properties::SecurityParameters::new(
         Some(cert_path.to_path_buf()),
         Some(key_path.to_path_buf()),
     );
     //println!("{:?}", path.to_path_buf());
 
-    let mut p_c = PreConnection::new(Some(l_e), None, t_p, Some(sec));
+    let mut p_c = PreConnection::new(None, Some(r_e), t_p, Some(sec));
 
-    let mut listener = p_c.listen().await;
+    let mut conn = p_c.initiate().await;
+    let request = b"GET / HTTP/1.1\r\nHost: www.youtube.com\r\n\r\n";
 
     //conn.send(&data);
 
-    match listener {
-        Some(mut listener) => {
-            //println!("sending");
-            //conn.send(b"").await;
-            println!("about to listen for connections");
-            let mut conn = listener.next_connection().await.unwrap();
-            println!("received a conn");
+    match conn {
+        Some(mut conn) => {
+            println!("sending");
+            conn.send(request).await;
+            //println!("about to listen for connections");
+            //let mut conn = conn.next_connection().await.unwrap();
+            //println!("received a conn");
             conn.recv().await;
-            conn.send(b"hi to you too").await;
+            //conn.send(b"hi to you too").await;
         }
         None => {
             println!("no conn")

@@ -76,6 +76,7 @@ impl QuicConnection {
         let mut roots = rustls::RootCertStore::empty();
         println!("here");
 
+        /** FOR LOCALHOST
         match fs::read(cert_path) {
             Ok(v) => match roots.add(&rustls::Certificate(v)) {
                 Ok(_) => {
@@ -96,12 +97,24 @@ impl QuicConnection {
         //{
         //  roots.add(&rustls::Certificate(cert.0)).unwrap();
         //}
+        */
+        let mut root_cert_store = rustls::RootCertStore::empty();
+        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
+            |ta| {
+                OwnedTrustAnchor::from_subject_spki_name_constraints(
+                    ta.subject,
+                    ta.spki,
+                    ta.name_constraints,
+                )
+            },
+        ));
 
         let mut client_crypto = rustls::ClientConfig::builder()
             .with_safe_defaults()
-            .with_root_certificates(roots)
+            .with_root_certificates(root_cert_store)
             .with_no_client_auth();
         client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
+
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
