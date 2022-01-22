@@ -103,7 +103,7 @@ impl QuicConnection {
     pub async fn connect(
         addr: SocketAddr,
         local_endpoint: SocketAddr,
-        cert_path: PathBuf,
+        cert_path: Option<PathBuf>,
         hostname: String,
     ) -> Option<QuicConnection> {
         println!(
@@ -113,38 +113,43 @@ impl QuicConnection {
 
         let client_crypto = gen_client_config(cert_path);
 
-        let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
-        endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
+        if let Some(client_crypto) = client_crypto {
+            let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
+            endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
 
-        match endpoint.connect(addr, &hostname) {
-            Ok(v) => match v.await {
-                Ok(new_conn) => {
-                    println!("await worked");
-                    let quinn::NewConnection {
-                        connection: conn, ..
-                    } = new_conn;
-                    match conn.open_bi().await {
-                        Ok((send, recv)) => {
-                            println!("open worked");
-                            return Some(QuicConnection {
-                                conn: conn,
-                                send: send,
-                                recv: recv,
-                            });
+            match endpoint.connect(addr, &hostname) {
+                Ok(v) => match v.await {
+                    Ok(new_conn) => {
+                        println!("await worked");
+                        let quinn::NewConnection {
+                            connection: conn, ..
+                        } = new_conn;
+                        match conn.open_bi().await {
+                            Ok((send, recv)) => {
+                                println!("open worked");
+                                return Some(QuicConnection {
+                                    conn: conn,
+                                    send: send,
+                                    recv: recv,
+                                });
+                            }
+                            Err(e) => return None,
                         }
-                        Err(e) => return None,
                     }
-                }
+                    Err(e) => {
+                        println!("await failed: {}", e);
+                        return None;
+                    }
+                },
                 Err(e) => {
-                    println!("await failed: {}", e);
+                    println!("endpoint.connect failed: {}", e);
                     return None;
                 }
-            },
-            Err(e) => {
-                println!("endpoint.connect failed: {}", e);
-                return None;
             }
+        } else {
+            return None;
         }
+
         println!("here");
     }
 }

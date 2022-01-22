@@ -84,39 +84,38 @@ impl PreConnection {
                             if candidate == "quic".to_string() {
                                 let quic_port = if *port == 80 { 443 } else { *port };
                                 if let Some(files) = &self.security_parameters {
-                                    if let Some(cert_path) = &files.certificate_path {
-                                        let local_endpoint = match &self.local_endpoint {
-                                            Some(endpoint) => match endpoint {
-                                                LocalEndpoint::Ipv4Port(ip, port) => {
-                                                    SocketAddr::new(IpAddr::V4(*ip), quic_port)
-                                                }
-                                                LocalEndpoint::Ipv6Port(ip, port) => {
-                                                    SocketAddr::new(IpAddr::V6(*ip), quic_port)
-                                                }
-                                            },
-                                            None => match ip {
-                                                IpAddr::V4(_) => SocketAddr::new(
-                                                    IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-                                                    0,
-                                                ),
-                                                IpAddr::V6(_) => SocketAddr::new(
-                                                    IpAddr::V6(Ipv6Addr::new(
-                                                        0, 0, 0, 0, 0, 0, 0, 0,
-                                                    )),
-                                                    0,
-                                                ),
-                                            },
-                                        };
-                                        //Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
-                                        let quic_candidate =
-                                            CandidateConnection::Quic(QuicCandidate {
-                                                addr: SocketAddr::new(*ip, quic_port),
-                                                local_endpoint: local_endpoint,
-                                                host: host.to_string(),
-                                                cert_path: cert_path.to_path_buf(),
-                                            });
-                                        candidate_connections.push(quic_candidate);
-                                    }
+                                    let local_endpoint = match &self.local_endpoint {
+                                        Some(endpoint) => match endpoint {
+                                            LocalEndpoint::Ipv4Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V4(*ip), quic_port)
+                                            }
+                                            LocalEndpoint::Ipv6Port(ip, port) => {
+                                                SocketAddr::new(IpAddr::V6(*ip), quic_port)
+                                            }
+                                        },
+                                        None => match ip {
+                                            IpAddr::V4(_) => SocketAddr::new(
+                                                IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                                                0,
+                                            ),
+                                            IpAddr::V6(_) => SocketAddr::new(
+                                                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)),
+                                                0,
+                                            ),
+                                        },
+                                    };
+                                    //Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1);
+                                    let cert_path = match &files.certificate_path {
+                                        Some(cert) => Some(cert.to_path_buf()),
+                                        None => None,
+                                    };
+                                    let quic_candidate = CandidateConnection::Quic(QuicCandidate {
+                                        addr: SocketAddr::new(*ip, quic_port),
+                                        local_endpoint: local_endpoint,
+                                        host: host.to_string(),
+                                        cert_path: cert_path,
+                                    });
+                                    candidate_connections.push(quic_candidate);
                                 }
                             }
                         }
@@ -146,29 +145,31 @@ impl PreConnection {
 
                         if candidate == "quic".to_string() {
                             if let Some(files) = &self.security_parameters {
-                                if let Some(cert_path) = &files.certificate_path {
-                                    let local_endpoint = match &self.local_endpoint {
-                                        Some(endpoint) => match endpoint {
-                                            LocalEndpoint::Ipv4Port(ip, port) => {
-                                                SocketAddr::new(IpAddr::V4(*ip), *port)
-                                            }
-                                            LocalEndpoint::Ipv6Port(ip, port) => {
-                                                SocketAddr::new(IpAddr::V6(*ip), *port)
-                                            }
-                                        },
-                                        None => SocketAddr::new(
-                                            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                                            8080,
-                                        ),
-                                    };
-                                    let quic_candidate = CandidateConnection::Quic(QuicCandidate {
-                                        addr: SocketAddr::new(IpAddr::V4(*ip), *port),
-                                        local_endpoint: local_endpoint,
-                                        host: host.to_string(),
-                                        cert_path: cert_path.to_path_buf(),
-                                    });
-                                    candidate_connections.push(quic_candidate);
-                                }
+                                let local_endpoint = match &self.local_endpoint {
+                                    Some(endpoint) => match endpoint {
+                                        LocalEndpoint::Ipv4Port(ip, port) => {
+                                            SocketAddr::new(IpAddr::V4(*ip), *port)
+                                        }
+                                        LocalEndpoint::Ipv6Port(ip, port) => {
+                                            SocketAddr::new(IpAddr::V6(*ip), *port)
+                                        }
+                                    },
+                                    None => SocketAddr::new(
+                                        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                                        8080,
+                                    ),
+                                };
+                                let cert_path = match &files.certificate_path {
+                                    Some(cert) => Some(cert.to_path_buf()),
+                                    None => None,
+                                };
+                                let quic_candidate = CandidateConnection::Quic(QuicCandidate {
+                                    addr: SocketAddr::new(IpAddr::V4(*ip), *port),
+                                    local_endpoint: local_endpoint,
+                                    host: host.to_string(),
+                                    cert_path: cert_path,
+                                });
+                                candidate_connections.push(quic_candidate);
                             }
                         }
                     }
@@ -197,29 +198,31 @@ impl PreConnection {
 
                         if candidate == "quic".to_string() {
                             if let Some(files) = &self.security_parameters {
-                                if let Some(cert_path) = &files.certificate_path {
-                                    let local_endpoint = match &self.local_endpoint {
-                                        Some(endpoint) => match endpoint {
-                                            LocalEndpoint::Ipv4Port(ip, port) => {
-                                                SocketAddr::new(IpAddr::V4(*ip), *port)
-                                            }
-                                            LocalEndpoint::Ipv6Port(ip, port) => {
-                                                SocketAddr::new(IpAddr::V6(*ip), *port)
-                                            }
-                                        },
-                                        None => SocketAddr::new(
-                                            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                                            8080,
-                                        ),
-                                    };
-                                    let quic_candidate = CandidateConnection::Quic(QuicCandidate {
-                                        addr: SocketAddr::new(IpAddr::V6(*ip), *port),
-                                        local_endpoint: local_endpoint,
-                                        host: host.to_string(),
-                                        cert_path: cert_path.to_path_buf(),
-                                    });
-                                    candidate_connections.push(quic_candidate);
-                                }
+                                let local_endpoint = match &self.local_endpoint {
+                                    Some(endpoint) => match endpoint {
+                                        LocalEndpoint::Ipv4Port(ip, port) => {
+                                            SocketAddr::new(IpAddr::V4(*ip), *port)
+                                        }
+                                        LocalEndpoint::Ipv6Port(ip, port) => {
+                                            SocketAddr::new(IpAddr::V6(*ip), *port)
+                                        }
+                                    },
+                                    None => SocketAddr::new(
+                                        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                                        8080,
+                                    ),
+                                };
+                                let cert_path = match &files.certificate_path {
+                                    Some(cert) => Some(cert.to_path_buf()),
+                                    None => None,
+                                };
+                                let quic_candidate = CandidateConnection::Quic(QuicCandidate {
+                                    addr: SocketAddr::new(IpAddr::V6(*ip), *port),
+                                    local_endpoint: local_endpoint,
+                                    host: host.to_string(),
+                                    cert_path: cert_path,
+                                });
+                                candidate_connections.push(quic_candidate);
                             }
                         }
                     }
@@ -487,7 +490,7 @@ struct QuicCandidate {
     addr: SocketAddr,
     local_endpoint: SocketAddr,
     host: String,
-    cert_path: PathBuf,
+    cert_path: Option<PathBuf>,
 }
 
 struct TcpListenerCandidate {
