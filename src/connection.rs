@@ -55,6 +55,44 @@ impl Connection for TcpConnection {
 
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"h3"];
 
+pub fn gen_client_config(cert_path: Option<PathBuf>) -> Option<rustls::ClientConfig> {
+    let mut root_cert_store = rustls::RootCertStore::empty();
+    match cert_path {
+        Some(path) => match fs::read(path) {
+            Ok(v) => match root_cert_store.add(&rustls::Certificate(v)) {
+                Ok(_) => {
+                    println!("ok")
+                }
+                Err(_) => {
+                    println!("error add");
+                    return None;
+                }
+            },
+            Err(e) => {
+                println!("error read");
+                return None;
+            }
+        },
+        None => {
+            root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
+                |ta| {
+                    OwnedTrustAnchor::from_subject_spki_name_constraints(
+                        ta.subject,
+                        ta.spki,
+                        ta.name_constraints,
+                    )
+                },
+            ));
+        }
+    }
+    let mut client_crypto = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_cert_store)
+        .with_no_client_auth();
+    client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
+    Some(client_crypto)
+}
+
 pub struct QuicConnection {
     pub conn: quinn::Connection,
     pub send: quinn::SendStream,
@@ -72,48 +110,8 @@ impl QuicConnection {
             "running quic. local address: {}, remote: {}, hostname: {}",
             local_endpoint, addr, hostname
         );
-        println!("here");
-        let mut roots = rustls::RootCertStore::empty();
-        println!("here");
 
-        /** FOR LOCALHOST
-        match fs::read(cert_path) {
-            Ok(v) => match roots.add(&rustls::Certificate(v)) {
-                Ok(_) => {
-                    println!("ok")
-                }
-                Err(_) => {
-                    println!("error add");
-                    return None;
-                }
-            },
-            Err(e) => {
-                println!("error read");
-                return None;
-            }
-        }
-        //let mut roots = rustls::RootCertStore::empty();
-        //for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs")
-        //{
-        //  roots.add(&rustls::Certificate(cert.0)).unwrap();
-        //}
-        */
-        let mut root_cert_store = rustls::RootCertStore::empty();
-        root_cert_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(
-            |ta| {
-                OwnedTrustAnchor::from_subject_spki_name_constraints(
-                    ta.subject,
-                    ta.spki,
-                    ta.name_constraints,
-                )
-            },
-        ));
-
-        let mut client_crypto = rustls::ClientConfig::builder()
-            .with_safe_defaults()
-            .with_root_certificates(root_cert_store)
-            .with_no_client_auth();
-        client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
+        let client_crypto = gen_client_config(cert_path);
 
         let mut endpoint = quinn::Endpoint::client(local_endpoint).unwrap();
         endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(client_crypto)));
@@ -153,7 +151,7 @@ impl QuicConnection {
 #[async_trait]
 impl Connection for QuicConnection {
     async fn send(&mut self, buffer: &[u8]) {
-        self.send.write_all(b"");
+        //self.send.write_all(b"");
         self.send.write_all(buffer).await.unwrap();
         self.send.finish().await;
     }
@@ -166,9 +164,9 @@ impl Connection for QuicConnection {
             resp,
             str::from_utf8(&buffer).unwrap()
         );
-        sleep(Duration::from_millis(30)).await;
-        self.recv.read(&mut buffer).await;
-        println!("{:?}", str::from_utf8(&buffer).unwrap());
+        //sleep(Duration::from_millis(30)).await;
+        //self.recv.read(&mut buffer).await;
+        //println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
     async fn close(&mut self) {
