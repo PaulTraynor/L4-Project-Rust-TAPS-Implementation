@@ -274,3 +274,21 @@
 * *2.5 hours* Fixed problems with QUIC cryptographic handshake 
 
 ## Week 14
+
+### 18 Jan 2022
+
+* *1.5 hours* Debugging QUIC listener
+
+### 22 Jan 2022
+
+* *3 hours* modified QUIC listener to use OS certificates if none specified 
+
+### 23 Jan 2022
+
+* *4 hours* Attempting to separate the concepts of messages and framers and fit them into connection, pre_connection etc.
+
+## Week 15
+
+### 24 Jan 2022
+
+* *5 hours* Trying out implementing different message and framer integrations into the codebase
