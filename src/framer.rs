@@ -1,4 +1,5 @@
 //use http_muncher::{Parser, ParserHandler};
+use crate::message::Message;
 use httparse;
 use httparse::Header;
 use std::str;

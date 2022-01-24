@@ -1,3 +1,5 @@
+use crate::framer::Framer;
+use crate::pre_connection::PreConnection;
 use async_trait::async_trait;
 use quinn;
 use std::convert::TryFrom;
@@ -18,8 +20,9 @@ const HTTP_REQ_STREAM_ID: u64 = 4;
 #[async_trait]
 pub trait Connection {
     async fn send(&mut self, buffer: &[u8]);
-    async fn recv(&mut self);
+    async fn recv(&mut self) -> Vec<u8>;
     async fn close(&mut self);
+    //fn add_framer(&mut self, framer:dyn Framer<Message=framer::Message>);
 }
 
 pub struct TcpConnection {
@@ -41,16 +44,20 @@ impl Connection for TcpConnection {
         self.stream.write(buffer).await.unwrap();
     }
 
-    async fn recv(&mut self) {
+    async fn recv(&mut self) -> Vec<u8> {
         let mut buffer: [u8; 500] = [0; 500];
         self.stream.read(&mut buffer).await.unwrap();
         println!("{:?}", str::from_utf8(&buffer).unwrap());
+        let mut vec: Vec<u8> = Vec::new();
+        vec.extend_from_slice(&buffer);
+        vec
     }
 
     async fn close(&mut self) {
         self.stream.shutdown().await;
         //.expect("failed to shutdown");
     }
+    //fn add_framer(&mut self){}
 }
 
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"h3"];
@@ -161,7 +168,7 @@ impl Connection for QuicConnection {
         self.send.finish().await;
     }
 
-    async fn recv(&mut self) {
+    async fn recv(&mut self) -> Vec<u8> {
         let mut buffer: [u8; 1024] = [0; 1024];
         let resp = self.recv.read(&mut buffer).await;
         println!(
@@ -172,6 +179,9 @@ impl Connection for QuicConnection {
         //sleep(Duration::from_millis(30)).await;
         //self.recv.read(&mut buffer).await;
         //println!("{:?}", str::from_utf8(&buffer).unwrap());
+        let mut vec: Vec<u8> = Vec::new();
+        vec.extend_from_slice(&buffer);
+        vec
     }
 
     async fn close(&mut self) {
@@ -232,13 +242,13 @@ impl Connection for TlsTcpConnection {
         }
     }
 
-    async fn recv(&mut self) {
+    async fn recv(&mut self) -> Vec<u8> {
         let mut buffer: [u8; 10000] = [0; 10000];
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
                 conn.read(&mut buffer).await;
                 println!("{:?}", str::from_utf8(&buffer).unwrap());
-                sleep(Duration::from_millis(30)).await;
+                sleep(Duration::from_millis(100)).await;
                 conn.read(&mut buffer).await;
                 println!("{:?}", str::from_utf8(&buffer).unwrap());
             }
@@ -246,6 +256,9 @@ impl Connection for TlsTcpConnection {
                 conn.read(&mut buffer).await;
             }
         }
+        let mut vec: Vec<u8> = Vec::new();
+        vec.extend_from_slice(&buffer);
+        vec
     }
 
     async fn close(&mut self) {

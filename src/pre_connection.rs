@@ -1,8 +1,10 @@
+use crate::connection;
 use crate::connection::Connection;
 use crate::connection::*;
 use crate::endpoint;
 use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
+use crate::framer::Framer;
 use crate::listener::*;
 use crate::transport_properties;
 use crate::transport_properties::Preference::*;
@@ -230,7 +232,7 @@ impl PreConnection {
             },
             None => panic!("no remote endpoint added"),
         }
-        let conn = match race_connections(candidate_connections).await {
+        let conn = match self.race_connections(candidate_connections).await {
             (Some(conn), None) => Some(conn),
             _ => None,
         };
@@ -308,7 +310,7 @@ impl PreConnection {
                 ));
             }
         }
-        let listener = match race_connections(candidate_listeners).await {
+        let listener = match self.race_connections(candidate_listeners).await {
             (None, Some(listener)) => Some(listener),
             _ => None,
         };
@@ -461,6 +463,122 @@ impl PreConnection {
         println!("final protocols: {:?}", final_protocols);
         final_protocols
     }
+
+    async fn race_connections(
+        &mut self,
+        candidate_connections: Vec<CandidateConnection>,
+    ) -> (Option<Box<dyn Connection>>, Option<Box<dyn Listener>>) {
+        println!("{}", candidate_connections.len());
+        let tcp_map = Arc::new(Mutex::new(HashMap::new()));
+        let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
+        let quic_map = Arc::new(Mutex::new(HashMap::new()));
+        let tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
+        let tls_tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
+        let quic_listener_map = Arc::new(Mutex::new(HashMap::new()));
+        let tcp_map_clone = tcp_map.clone();
+        let tls_tcp_map_clone = tls_tcp_map.clone();
+        let quic_map_clone = quic_map.clone();
+        let tcp_listener_map_clone = tcp_listener_map.clone();
+        let tls_tcp_listener_map_clone = tls_tcp_listener_map.clone();
+        let quic_listener_map_clone = quic_listener_map.clone();
+        let found = false;
+        let found = Arc::new(Mutex::new(found));
+        let other_found = found.clone();
+        tokio::spawn(async move {
+            for candidate in candidate_connections {
+                let found = found.clone();
+                match candidate {
+                    CandidateConnection::Tcp(data) => {
+                        println!("here");
+                        let conn_dict = tcp_map.clone();
+                        tokio::spawn(async move {
+                            println!("run tcp");
+                            run_connection_tcp(data, conn_dict, found).await;
+                        });
+                    }
+                    CandidateConnection::TlsTcp(data) => {
+                        let conn_dict = tls_tcp_map.clone();
+                        tokio::spawn(async move {
+                            println!("run tls tcp");
+                            run_connection_tls_tcp(data, conn_dict, found).await;
+                        });
+                    }
+                    CandidateConnection::Quic(data) => {
+                        let conn_dict = quic_map.clone();
+                        tokio::spawn(async move {
+                            println!("run quic");
+                            run_connection_quic(data, conn_dict, found).await;
+                        });
+                    }
+                    CandidateConnection::TcpListener(data) => {
+                        let conn_dict = tcp_listener_map.clone();
+                        tokio::spawn(async move {
+                            run_listener_tcp(data, conn_dict, found).await;
+                        });
+                    }
+                    CandidateConnection::TlsTcpListener(data) => {
+                        let conn_dict = tls_tcp_listener_map.clone();
+                        tokio::spawn(async move {
+                            run_listener_tls_tcp(data, conn_dict, found).await;
+                        });
+                    }
+                    CandidateConnection::QuicListener(data) => {
+                        let conn_dict = quic_listener_map.clone();
+                        tokio::spawn(async move {
+                            run_listener_quic(data, conn_dict, found).await;
+                        });
+                    }
+                }
+                sleep(Duration::from_millis(30)).await;
+            }
+        });
+        if tokio::spawn(async move {
+            loop {
+                let other_found = other_found.lock().unwrap();
+                if *other_found {
+                    return true;
+                }
+            }
+        })
+        .await
+        .unwrap()
+            == true
+        {
+            if !tcp_map_clone.lock().unwrap().is_empty() {
+                let mut conn = tcp_map_clone.lock().unwrap();
+                let conn = conn.remove("conn").unwrap();
+                println!("returning");
+                return (Some(Box::new(conn)), None);
+            } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
+                let mut conn = tls_tcp_map_clone.lock().unwrap();
+                let conn = conn.remove("conn").unwrap();
+                println!("returning tls/tcp");
+                return (Some(Box::new(conn)), None);
+            } else if !quic_map_clone.lock().unwrap().is_empty() {
+                let mut conn = quic_map_clone.lock().unwrap();
+                let conn = conn.remove("conn").unwrap();
+                return (Some(Box::new(conn)), None);
+            } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
+                let mut listener = tcp_listener_map_clone.lock().unwrap();
+                println!("tcp listener won");
+                let listener = listener.remove("listener").unwrap();
+                return (None, Some(Box::new(listener)));
+            } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
+                let mut listener = tls_tcp_listener_map_clone.lock().unwrap();
+                let listener = listener.remove("listener").unwrap();
+                return (None, Some(Box::new(listener)));
+            } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
+                let mut listener = quic_listener_map_clone.lock().unwrap();
+                println!("quic listener won");
+                let listener = listener.remove("listener").unwrap();
+                return (None, Some(Box::new(listener)));
+            } else {
+                return (None, None);
+            }
+        } else {
+            return (None, None);
+        }
+    }
 }
 
 struct PreferenceLevel {
@@ -513,124 +631,6 @@ struct QuicListenerCandidate {
 enum CallerType {
     Client,
     Server,
-}
-
-async fn race_connections(
-    candidate_connections: Vec<CandidateConnection>,
-) -> (Option<Box<dyn Connection>>, Option<Box<dyn Listener>>) {
-    println!("{}", candidate_connections.len());
-    let tcp_map = Arc::new(Mutex::new(HashMap::new()));
-    let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
-    let quic_map = Arc::new(Mutex::new(HashMap::new()));
-    let tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
-    let tls_tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
-    let quic_listener_map = Arc::new(Mutex::new(HashMap::new()));
-
-    let tcp_map_clone = tcp_map.clone();
-    let tls_tcp_map_clone = tls_tcp_map.clone();
-    let quic_map_clone = quic_map.clone();
-    let tcp_listener_map_clone = tcp_listener_map.clone();
-    let tls_tcp_listener_map_clone = tls_tcp_listener_map.clone();
-    let quic_listener_map_clone = quic_listener_map.clone();
-
-    let found = false;
-    let found = Arc::new(Mutex::new(found));
-    let other_found = found.clone();
-
-    tokio::spawn(async move {
-        for candidate in candidate_connections {
-            let found = found.clone();
-            match candidate {
-                CandidateConnection::Tcp(data) => {
-                    println!("here");
-                    let conn_dict = tcp_map.clone();
-                    tokio::spawn(async move {
-                        println!("run tcp");
-                        run_connection_tcp(data, conn_dict, found).await;
-                    });
-                }
-                CandidateConnection::TlsTcp(data) => {
-                    let conn_dict = tls_tcp_map.clone();
-                    tokio::spawn(async move {
-                        println!("run tls tcp");
-                        run_connection_tls_tcp(data, conn_dict, found).await;
-                    });
-                }
-                CandidateConnection::Quic(data) => {
-                    let conn_dict = quic_map.clone();
-                    tokio::spawn(async move {
-                        println!("run quic");
-                        run_connection_quic(data, conn_dict, found).await;
-                    });
-                }
-                CandidateConnection::TcpListener(data) => {
-                    let conn_dict = tcp_listener_map.clone();
-                    tokio::spawn(async move {
-                        run_listener_tcp(data, conn_dict, found).await;
-                    });
-                }
-                CandidateConnection::TlsTcpListener(data) => {
-                    let conn_dict = tls_tcp_listener_map.clone();
-                    tokio::spawn(async move {
-                        run_listener_tls_tcp(data, conn_dict, found).await;
-                    });
-                }
-                CandidateConnection::QuicListener(data) => {
-                    let conn_dict = quic_listener_map.clone();
-                    tokio::spawn(async move {
-                        run_listener_quic(data, conn_dict, found).await;
-                    });
-                }
-            }
-            sleep(Duration::from_millis(30)).await;
-        }
-    });
-
-    if tokio::spawn(async move {
-        loop {
-            let other_found = other_found.lock().unwrap();
-            if *other_found {
-                return true;
-            }
-        }
-    })
-    .await
-    .unwrap()
-        == true
-    {
-        if !tcp_map_clone.lock().unwrap().is_empty() {
-            let mut conn = tcp_map_clone.lock().unwrap();
-            let conn = conn.remove("conn").unwrap();
-            println!("returning");
-            return (Some(Box::new(conn)), None);
-        } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
-            let mut conn = tls_tcp_map_clone.lock().unwrap();
-            let conn = conn.remove("conn").unwrap();
-            return (Some(Box::new(conn)), None);
-        } else if !quic_map_clone.lock().unwrap().is_empty() {
-            let mut conn = quic_map_clone.lock().unwrap();
-            let conn = conn.remove("conn").unwrap();
-            return (Some(Box::new(conn)), None);
-        } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
-            let mut listener = tcp_listener_map_clone.lock().unwrap();
-            println!("tcp listener won");
-            let listener = listener.remove("listener").unwrap();
-            return (None, Some(Box::new(listener)));
-        } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
-            let mut listener = tls_tcp_listener_map_clone.lock().unwrap();
-            let listener = listener.remove("listener").unwrap();
-            return (None, Some(Box::new(listener)));
-        } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
-            let mut listener = quic_listener_map_clone.lock().unwrap();
-            println!("quic listener won");
-            let listener = listener.remove("listener").unwrap();
-            return (None, Some(Box::new(listener)));
-        } else {
-            return (None, None);
-        }
-    } else {
-        return (None, None);
-    }
 }
 
 async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {

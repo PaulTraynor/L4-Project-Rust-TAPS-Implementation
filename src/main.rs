@@ -3,6 +3,7 @@ mod endpoint;
 mod error;
 mod framer;
 mod listener;
+mod message;
 mod pre_connection;
 mod transport_properties;
 use crate::connection::Connection;
@@ -12,11 +13,11 @@ use crate::connection::TlsTcpConnection;
 use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
 use crate::framer::Framer;
+use crate::framer::*;
 use crate::listener::Listener;
 use crate::pre_connection::PreConnection;
-use crate::transport_properties::{Preference, SelectionProperty};
-//use crate::framer::*;
 use crate::transport_properties::*;
+use crate::transport_properties::{Preference, SelectionProperty};
 use quiche::h3::NameValue;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -98,9 +99,9 @@ async fn main() {
 
     t_p.add_selection_property(SelectionProperty::Reliability(Preference::Require));
     t_p.add_selection_property(SelectionProperty::Secure(Preference::Require));
-    t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Require));
+    //t_p.add_selection_property(SelectionProperty::Multistreaming(Preference::Require));
 
-    let r_e = RemoteEndpoint::HostnamePort("h3.stammw.eu".to_string(), 443);
+    let r_e = RemoteEndpoint::HostnamePort("www.google.co.uk".to_string(), 443);
     let l_e = LocalEndpoint::Ipv4Port(Ipv4Addr::new(127, 0, 0, 1), 8080);
 
     let cert_path = Path::new("src/my.der");
@@ -114,7 +115,7 @@ async fn main() {
     let mut p_c = PreConnection::new(None, Some(r_e), t_p, Some(sec));
 
     let mut conn = p_c.initiate().await;
-    let request = b"GET / HTTP/1.1\r\nHost: www.youtube.com\r\n\r\n";
+    let request = b"GET / HTTP/1.1\r\nHost: www.google.co.uk\r\n\r\n";
 
     //conn.send(&data);
 
@@ -125,7 +126,8 @@ async fn main() {
             //println!("about to listen for connections");
             //let mut conn = conn.next_connection().await.unwrap();
             //println!("received a conn");
-            conn.recv().await;
+            let data = conn.recv().await;
+            println!("{}", data.len());
             //conn.send(b"hi to you too").await;
         }
         None => {
