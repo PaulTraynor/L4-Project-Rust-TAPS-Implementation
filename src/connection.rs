@@ -1,4 +1,5 @@
 use crate::framer::Framer;
+use crate::message::Message;
 use crate::pre_connection::PreConnection;
 use async_trait::async_trait;
 use quinn;
@@ -19,8 +20,8 @@ const HTTP_REQ_STREAM_ID: u64 = 4;
 
 #[async_trait]
 pub trait Connection {
-    async fn send(&mut self, buffer: &[u8]);
-    async fn recv(&mut self) -> Vec<u8>;
+    async fn send(&mut self, message: Message);
+    async fn recv(&mut self) -> Message;
     async fn close(&mut self);
     //fn add_framer(&mut self, framer:dyn Framer<Message=framer::Message>);
 }
@@ -40,17 +41,17 @@ impl TcpConnection {
 
 #[async_trait]
 impl Connection for TcpConnection {
-    async fn send(&mut self, buffer: &[u8]) {
-        self.stream.write(buffer).await.unwrap();
+    async fn send(&mut self, message: Message) {
+        self.stream.write(&message.content).await.unwrap();
     }
 
-    async fn recv(&mut self) -> Vec<u8> {
+    async fn recv(&mut self) -> Message {
         let mut buffer: [u8; 500] = [0; 500];
         self.stream.read(&mut buffer).await.unwrap();
         println!("{:?}", str::from_utf8(&buffer).unwrap());
         let mut vec: Vec<u8> = Vec::new();
         vec.extend_from_slice(&buffer);
-        vec
+        Message { content: vec }
     }
 
     async fn close(&mut self) {
@@ -162,13 +163,13 @@ impl QuicConnection {
 }
 #[async_trait]
 impl Connection for QuicConnection {
-    async fn send(&mut self, buffer: &[u8]) {
+    async fn send(&mut self, message: Message) {
         //self.send.write_all(b"");
-        self.send.write_all(buffer).await.unwrap();
+        self.send.write_all(&message.content).await.unwrap();
         self.send.finish().await;
     }
 
-    async fn recv(&mut self) -> Vec<u8> {
+    async fn recv(&mut self) -> Message {
         let mut buffer: [u8; 1024] = [0; 1024];
         let resp = self.recv.read(&mut buffer).await;
         println!(
@@ -181,7 +182,7 @@ impl Connection for QuicConnection {
         //println!("{:?}", str::from_utf8(&buffer).unwrap());
         let mut vec: Vec<u8> = Vec::new();
         vec.extend_from_slice(&buffer);
-        vec
+        Message { content: vec }
     }
 
     async fn close(&mut self) {
@@ -231,26 +232,22 @@ impl TlsTcpConnection {
 
 #[async_trait]
 impl Connection for TlsTcpConnection {
-    async fn send(&mut self, buf: &[u8]) {
+    async fn send(&mut self, message: Message) {
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
-                conn.write_all(buf).await;
+                conn.write_all(&message.content).await;
             }
             TlsTcpConn::Server(conn) => {
-                conn.write_all(buf).await;
+                conn.write_all(&message.content).await;
             }
         }
     }
 
-    async fn recv(&mut self) -> Vec<u8> {
+    async fn recv(&mut self) -> Message {
         let mut buffer: [u8; 10000] = [0; 10000];
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => {
                 conn.read(&mut buffer).await;
-                println!("{:?}", str::from_utf8(&buffer).unwrap());
-                sleep(Duration::from_millis(100)).await;
-                conn.read(&mut buffer).await;
-                println!("{:?}", str::from_utf8(&buffer).unwrap());
             }
             TlsTcpConn::Server(conn) => {
                 conn.read(&mut buffer).await;
@@ -258,7 +255,7 @@ impl Connection for TlsTcpConnection {
         }
         let mut vec: Vec<u8> = Vec::new();
         vec.extend_from_slice(&buffer);
-        vec
+        Message { content: vec }
     }
 
     async fn close(&mut self) {

@@ -122,12 +122,12 @@ async fn main() {
     match conn {
         Some(mut conn) => {
             println!("sending");
-            conn.send(request).await;
+            //conn.send(request).await;
             //println!("about to listen for connections");
             //let mut conn = conn.next_connection().await.unwrap();
             //println!("received a conn");
             let data = conn.recv().await;
-            println!("{}", data.len());
+            println!("{}", data.content.len());
             //conn.send(b"hi to you too").await;
         }
         None => {
