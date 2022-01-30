@@ -3,6 +3,7 @@ mod endpoint;
 mod error;
 mod framer;
 mod listener;
+mod message;
 mod pre_connection;
 mod transport_properties;
 use crate::connection::Connection;
