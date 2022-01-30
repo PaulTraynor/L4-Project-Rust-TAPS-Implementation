@@ -16,6 +16,23 @@ impl TransportProperties {
     pub fn add_selection_property(&mut self, selectionProperty: SelectionProperty) {
         self.selectionProperties.push(selectionProperty);
     }
+
+    pub fn default() -> TransportProperties {
+        let mut selectionProperties = Vec::new();
+        let connectionProperties = Vec::new();
+        selectionProperties.push(SelectionProperty::Reliability(Preference::Require));
+        selectionProperties.push(SelectionProperty::PreserveMsgBoundaries(
+            Preference::Require,
+        ));
+        selectionProperties.push(SelectionProperty::PreserveOrder(Preference::Require));
+        selectionProperties.push(SelectionProperty::Multistreaming(Preference::Ignore));
+        selectionProperties.push(SelectionProperty::CongestionControl(Preference::Require));
+        selectionProperties.push(SelectionProperty::Secure(Preference::Require));
+        TransportProperties {
+            selectionProperties: selectionProperties,
+            connectionProperties: connectionProperties,
+        }
+    }
 }
 
 pub enum SelectionProperty {
