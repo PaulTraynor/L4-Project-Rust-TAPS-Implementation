@@ -52,11 +52,19 @@ pub struct SecurityParameters {
 }
 
 impl SecurityParameters {
-    pub fn new(path_1: Option<PathBuf>, path_2: Option<PathBuf>) -> SecurityParameters {
+    pub fn new() -> SecurityParameters {
         SecurityParameters {
-            certificate_path: path_1,
-            private_key_path: path_2,
+            certificate_path: None,
+            private_key_path: None,
         }
+    }
+
+    pub fn add_key(&mut self, key_path: PathBuf) {
+        self.private_key_path = Some(key_path);
+    }
+
+    pub fn add_cert(&mut self, cert_path: PathBuf) {
+        self.certificate_path = Some(cert_path);
     }
 }
 

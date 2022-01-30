@@ -107,8 +107,8 @@ async fn main() {
     let cert_path = Path::new("src/my.der");
     let key_path = Path::new("src/key.der");
     let sec = transport_properties::SecurityParameters::new(
-        Some(cert_path.to_path_buf()),
-        Some(key_path.to_path_buf()),
+        //Some(cert_path.to_path_buf()),
+        //Some(key_path.to_path_buf()),
     );
     //println!("{:?}", path.to_path_buf());
 
