@@ -1,1 +1,4 @@
-pub enum Error {}
+pub enum TransportServicesError {
+    SendFailed,
+    RecvFailed,
+}

@@ -1,3 +1,4 @@
+use crate::error::TransportServicesError;
 use crate::framer::Framer;
 use crate::message::Message;
 use crate::pre_connection::PreConnection;
@@ -18,12 +19,16 @@ use tokio_rustls::TlsConnector;
 
 const HTTP_REQ_STREAM_ID: u64 = 4;
 
+pub enum SuccessEvent {
+    SendSuccess,
+    RecvSuccess,
+}
+
 #[async_trait]
 pub trait Connection {
-    async fn send(&mut self, message: Message);
-    async fn recv(&mut self) -> Message;
+    async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError>;
+    async fn recv(&mut self) -> Result<Message, TransportServicesError>;
     async fn close(&mut self);
-    //fn add_framer(&mut self, framer:dyn Framer<Message=framer::Message>);
 }
 
 pub struct TcpConnection {
@@ -41,17 +46,24 @@ impl TcpConnection {
 
 #[async_trait]
 impl Connection for TcpConnection {
-    async fn send(&mut self, message: Message) {
-        self.stream.write(&message.content).await.unwrap();
+    async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError> {
+        match self.stream.write(&message.content).await {
+            Ok(num_bytes) => Ok(num_bytes),
+            Err(_) => Err(TransportServicesError::SendFailed),
+        }
     }
 
-    async fn recv(&mut self) -> Message {
+    async fn recv(&mut self) -> Result<Message, TransportServicesError> {
         let mut buffer: [u8; 500] = [0; 500];
-        self.stream.read(&mut buffer).await.unwrap();
-        println!("{:?}", str::from_utf8(&buffer).unwrap());
-        let mut vec: Vec<u8> = Vec::new();
-        vec.extend_from_slice(&buffer);
-        Message { content: vec }
+        match self.stream.read(&mut buffer).await {
+            Ok(num_bytes) => {
+                let mut vec: Vec<u8> = Vec::new();
+                vec.extend_from_slice(&buffer);
+                Ok(Message { content: vec })
+            }
+            Err(_) => Err(TransportServicesError::RecvFailed),
+        }
+        //println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
     async fn close(&mut self) {
