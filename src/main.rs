@@ -127,7 +127,7 @@ async fn main() {
             //let mut conn = conn.next_connection().await.unwrap();
             //println!("received a conn");
             let data = conn.recv().await;
-            println!("{}", data.content.len());
+            //println!("{}", data.content.len());
             //conn.send(b"hi to you too").await;
         }
         None => {

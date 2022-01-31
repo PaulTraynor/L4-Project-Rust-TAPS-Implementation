@@ -28,7 +28,7 @@ pub enum SuccessEvent {
 pub trait Connection {
     async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError>;
     async fn recv(&mut self) -> Result<Message, TransportServicesError>;
-    async fn close(&mut self);
+    async fn close(&mut self) -> Result<(), TransportServicesError>;
 }
 
 pub struct TcpConnection {
@@ -66,8 +66,11 @@ impl Connection for TcpConnection {
         //println!("{:?}", str::from_utf8(&buffer).unwrap());
     }
 
-    async fn close(&mut self) {
-        self.stream.shutdown().await;
+    async fn close(&mut self) -> Result<(), TransportServicesError> {
+        match self.stream.shutdown().await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(TransportServicesError::ShutdownFailed),
+        }
         //.expect("failed to shutdown");
     }
     //fn add_framer(&mut self){}
@@ -175,31 +178,34 @@ impl QuicConnection {
 }
 #[async_trait]
 impl Connection for QuicConnection {
-    async fn send(&mut self, message: Message) {
-        //self.send.write_all(b"");
-        self.send.write_all(&message.content).await.unwrap();
-        self.send.finish().await;
+    async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError> {
+        match self.send.write(&message.content).await {
+            Ok(num_bytes) => {
+                self.send.finish().await;
+                Ok(num_bytes)
+            }
+            Err(_) => Err(TransportServicesError::SendFailed),
+        }
     }
 
-    async fn recv(&mut self) -> Message {
+    async fn recv(&mut self) -> Result<Message, TransportServicesError> {
         let mut buffer: [u8; 1024] = [0; 1024];
-        let resp = self.recv.read(&mut buffer).await;
-        println!(
-            "recieved {:?} bytes: {:?}",
-            resp,
-            str::from_utf8(&buffer).unwrap()
-        );
-        //sleep(Duration::from_millis(30)).await;
-        //self.recv.read(&mut buffer).await;
-        //println!("{:?}", str::from_utf8(&buffer).unwrap());
-        let mut vec: Vec<u8> = Vec::new();
-        vec.extend_from_slice(&buffer);
-        Message { content: vec }
+        match self.recv.read(&mut buffer).await {
+            Ok(_) => {
+                let mut vec: Vec<u8> = Vec::new();
+                vec.extend_from_slice(&buffer);
+                Ok(Message { content: vec })
+            }
+            Err(_) => Err(TransportServicesError::RecvFailed),
+        }
     }
 
-    async fn close(&mut self) {
-        //self.send.finish().await;
-        self.conn.close(0u32.into(), b"done");
+    async fn close(&mut self) -> Result<(), TransportServicesError> {
+        match self.send.finish().await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(TransportServicesError::ShutdownFailed),
+        }
+        //self.conn.close(0u32.into(), b"done");
     }
 }
 pub enum TlsTcpConn {
@@ -244,40 +250,51 @@ impl TlsTcpConnection {
 
 #[async_trait]
 impl Connection for TlsTcpConnection {
-    async fn send(&mut self, message: Message) {
+    async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError> {
         match &mut self.tls_conn {
-            TlsTcpConn::Client(conn) => {
-                conn.write_all(&message.content).await;
-            }
-            TlsTcpConn::Server(conn) => {
-                conn.write_all(&message.content).await;
-            }
+            TlsTcpConn::Client(conn) => match conn.write(&message.content).await {
+                Ok(num_bytes) => Ok(num_bytes),
+                Err(_) => Err(TransportServicesError::SendFailed),
+            },
+            TlsTcpConn::Server(conn) => match conn.write(&message.content).await {
+                Ok(num_bytes) => Ok(num_bytes),
+                Err(_) => Err(TransportServicesError::SendFailed),
+            },
         }
     }
 
-    async fn recv(&mut self) -> Message {
+    async fn recv(&mut self) -> Result<Message, TransportServicesError> {
         let mut buffer: [u8; 10000] = [0; 10000];
         match &mut self.tls_conn {
-            TlsTcpConn::Client(conn) => {
-                conn.read(&mut buffer).await;
-            }
-            TlsTcpConn::Server(conn) => {
-                conn.read(&mut buffer).await;
-            }
+            TlsTcpConn::Client(conn) => match conn.read(&mut buffer).await {
+                Ok(_) => {
+                    let mut vec: Vec<u8> = Vec::new();
+                    vec.extend_from_slice(&buffer);
+                    Ok(Message { content: vec })
+                }
+                Err(_) => Err(TransportServicesError::RecvFailed),
+            },
+            TlsTcpConn::Server(conn) => match conn.read(&mut buffer).await {
+                Ok(_) => {
+                    let mut vec: Vec<u8> = Vec::new();
+                    vec.extend_from_slice(&buffer);
+                    Ok(Message { content: vec })
+                }
+                Err(_) => Err(TransportServicesError::RecvFailed),
+            },
         }
-        let mut vec: Vec<u8> = Vec::new();
-        vec.extend_from_slice(&buffer);
-        Message { content: vec }
     }
 
-    async fn close(&mut self) {
+    async fn close(&mut self) -> Result<(), TransportServicesError> {
         match &mut self.tls_conn {
-            TlsTcpConn::Client(conn) => {
-                conn.shutdown().await;
-            }
-            TlsTcpConn::Server(conn) => {
-                conn.shutdown().await;
-            }
+            TlsTcpConn::Client(conn) => match conn.shutdown().await {
+                Ok(_) => Ok(()),
+                Err(_) => Err(TransportServicesError::ShutdownFailed),
+            },
+            TlsTcpConn::Server(conn) => match conn.shutdown().await {
+                Ok(_) => Ok(()),
+                Err(_) => Err(TransportServicesError::ShutdownFailed),
+            },
         }
     }
 }
