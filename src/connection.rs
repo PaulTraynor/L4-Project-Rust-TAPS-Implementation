@@ -237,14 +237,18 @@ impl TlsTcpConnection {
             .with_no_client_auth(); // i guess this was previously the default?
         let connector = TlsConnector::from(Arc::new(config));
 
-        let stream = tokio::net::TcpStream::connect(&addr).await.unwrap();
-        let domain = rustls::ServerName::try_from(host.as_str())
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid dnsname"))
-            .unwrap();
-        let conn = connector.connect(domain, stream).await.unwrap();
-        Some(TlsTcpConnection {
-            tls_conn: TlsTcpConn::Client(conn),
-        })
+        match tokio::net::TcpStream::connect(&addr).await {
+            Ok(stream) => {
+                let domain = rustls::ServerName::try_from(host.as_str()).unwrap();
+                match connector.connect(domain, stream).await {
+                    Ok(conn) => Some(TlsTcpConnection {
+                        tls_conn: TlsTcpConn::Client(conn),
+                    }),
+                    Err(_) => None,
+                }
+            }
+            Err(_) => None,
+        }
     }
 }
 
