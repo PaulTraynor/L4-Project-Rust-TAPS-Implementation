@@ -120,7 +120,7 @@ async fn main() {
     //conn.send(&data);
 
     match conn {
-        Some(mut conn) => {
+        Ok(mut conn) => {
             println!("sending");
             //conn.send(request).await;
             //println!("about to listen for connections");
@@ -130,7 +130,7 @@ async fn main() {
             //println!("{}", data.content.len());
             //conn.send(b"hi to you too").await;
         }
-        None => {
+        _ => {
             println!("no conn")
         }
     }

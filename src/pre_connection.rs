@@ -4,6 +4,7 @@ use crate::connection::*;
 use crate::endpoint;
 use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
+use crate::error::TransportServicesError;
 use crate::framer::Framer;
 use crate::listener::*;
 use crate::transport_properties;
@@ -50,7 +51,7 @@ impl PreConnection {
         }
     }
 
-    pub async fn initiate(&mut self) -> Option<Box<dyn Connection>> {
+    pub async fn initiate(&mut self) -> Result<Box<dyn Connection>, TransportServicesError> {
         let mut candidate_connections = Vec::new();
 
         // candidate gathering...
@@ -233,8 +234,8 @@ impl PreConnection {
             None => panic!("no remote endpoint added"),
         }
         let conn = match self.race_connections(candidate_connections).await {
-            (Some(conn), None) => Some(conn),
-            _ => None,
+            Ok((Some(conn), None)) => Ok(conn),
+            _ => Err(TransportServicesError::InitiateFailed),
         };
 
         conn
@@ -243,7 +244,7 @@ impl PreConnection {
         //Some(TcpConnection::connect(addr).await.unwrap())
     }
 
-    pub async fn listen(&mut self) -> Option<Box<dyn Listener>> {
+    pub async fn listen(&mut self) -> Result<Box<dyn Listener>, TransportServicesError> {
         let candidates = self.gather_candidates(CallerType::Server);
         let mut candidate_listeners = Vec::new();
 
@@ -311,8 +312,8 @@ impl PreConnection {
             }
         }
         let listener = match self.race_connections(candidate_listeners).await {
-            (None, Some(listener)) => Some(listener),
-            _ => None,
+            Ok((None, Some(listener))) => Ok(listener),
+            _ => Err(TransportServicesError::ListenFailed),
         };
 
         listener
@@ -467,7 +468,8 @@ impl PreConnection {
     async fn race_connections(
         &mut self,
         candidate_connections: Vec<CandidateConnection>,
-    ) -> (Option<Box<dyn Connection>>, Option<Box<dyn Listener>>) {
+    ) -> Result<(Option<Box<dyn Connection>>, Option<Box<dyn Listener>>), TransportServicesError>
+    {
         println!("{}", candidate_connections.len());
         let tcp_map = Arc::new(Mutex::new(HashMap::new()));
         let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
@@ -548,35 +550,35 @@ impl PreConnection {
                 let mut conn = tcp_map_clone.lock().unwrap();
                 let conn = conn.remove("conn").unwrap();
                 println!("returning");
-                return (Some(Box::new(conn)), None);
+                return Ok((Some(Box::new(conn)), None));
             } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
                 let mut conn = tls_tcp_map_clone.lock().unwrap();
                 let conn = conn.remove("conn").unwrap();
                 println!("returning tls/tcp");
-                return (Some(Box::new(conn)), None);
+                return Ok((Some(Box::new(conn)), None));
             } else if !quic_map_clone.lock().unwrap().is_empty() {
                 let mut conn = quic_map_clone.lock().unwrap();
                 let conn = conn.remove("conn").unwrap();
-                return (Some(Box::new(conn)), None);
+                return Ok((Some(Box::new(conn)), None));
             } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
                 let mut listener = tcp_listener_map_clone.lock().unwrap();
                 println!("tcp listener won");
                 let listener = listener.remove("listener").unwrap();
-                return (None, Some(Box::new(listener)));
+                return Ok((None, Some(Box::new(listener))));
             } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
                 let mut listener = tls_tcp_listener_map_clone.lock().unwrap();
                 let listener = listener.remove("listener").unwrap();
-                return (None, Some(Box::new(listener)));
+                return Ok((None, Some(Box::new(listener))));
             } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
                 let mut listener = quic_listener_map_clone.lock().unwrap();
                 println!("quic listener won");
                 let listener = listener.remove("listener").unwrap();
-                return (None, Some(Box::new(listener)));
+                return Ok((None, Some(Box::new(listener))));
             } else {
-                return (None, None);
+                return Err(TransportServicesError::NoConnectionSucceeded);
             }
         } else {
-            return (None, None);
+            return Err(TransportServicesError::NoConnectionSucceeded);
         }
     }
 }
