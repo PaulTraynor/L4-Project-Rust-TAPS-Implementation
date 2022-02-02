@@ -269,6 +269,10 @@
 
 ## Week 13
 
+### 12 Jan 2022
+
+* *0.5 hours* Meeting with supervisor
+
 ### 16 Jan 2022
 
 * *2.5 hours* Fixed problems with QUIC cryptographic handshake 
@@ -278,6 +282,10 @@
 ### 18 Jan 2022
 
 * *1.5 hours* Debugging QUIC listener
+
+### 19 Jan 2022
+
+* *0.5 hours* Meeting with supervisor
 
 ### 22 Jan 2022
 
@@ -292,6 +300,10 @@
 ### 24 Jan 2022
 
 * *5 hours* Trying out implementing different message and framer integrations into the codebase
+
+### 26 Jan 2022
+
+* *0.5 hours* Meeting with supervisor
 
 ### 30 Jan 2022
 
