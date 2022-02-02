@@ -292,3 +292,20 @@
 ### 24 Jan 2022
 
 * *5 hours* Trying out implementing different message and framer integrations into the codebase
+
+### 30 Jan 2022
+
+* *1.5 hours* Improved interface by adding a default method for transport properties and setters for security parameters
+* *1 hour* Created message struct
+* *1.5 hours* Modified all send and recv methods to use messages
+
+## Week 16 
+
+### 31 Jan 2022
+
+* *2 hours* Modified all protocol send and recv methods to return Result enums, making the API more event driven
+
+### 01 Feb 2022
+
+* *1.5 hours* Increased robustness of TLS/TCP code by matching on more error prone parts of the code
+* *1 hour* Modified initiate and listen methods to return Result enums 
