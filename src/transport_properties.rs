@@ -21,9 +21,7 @@ impl TransportProperties {
         let mut selectionProperties = Vec::new();
         let connectionProperties = Vec::new();
         selectionProperties.push(SelectionProperty::Reliability(Preference::Require));
-        selectionProperties.push(SelectionProperty::PreserveMsgBoundaries(
-            Preference::Require,
-        ));
+        selectionProperties.push(SelectionProperty::PreserveMsgBoundaries(Preference::Ignore));
         selectionProperties.push(SelectionProperty::PreserveOrder(Preference::Require));
         selectionProperties.push(SelectionProperty::Multistreaming(Preference::Ignore));
         selectionProperties.push(SelectionProperty::CongestionControl(Preference::Require));

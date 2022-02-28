@@ -26,7 +26,6 @@ use tokio_stream::Stream;
 
 #[async_trait]
 pub trait Listener {
-    //type Connection;
     async fn next_connection(&mut self) -> Option<Box<dyn Connection>>;
 }
 

@@ -636,8 +636,6 @@ enum CallerType {
 }
 
 async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {
-    //let mut found = found.lock().unwrap();
-    //if !(*found) {
     println!("trying {}", conn.addr);
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
         let mut map = map.lock().unwrap();
@@ -647,9 +645,7 @@ async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnF
             map.insert("conn".to_string(), tcp_conn);
             *found = true;
         }
-        //*found = true;
     }
-    // }
 }
 
 async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, found: ConnFound) {
