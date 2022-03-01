@@ -1,23 +1,15 @@
 use crate::error::TransportServicesError;
-use crate::framer::Framer;
 use crate::message::Message;
-use crate::pre_connection::PreConnection;
 use async_trait::async_trait;
 use quinn;
 use std::convert::TryFrom;
-use std::io;
 use std::net::SocketAddr;
-use std::str;
 use std::sync::Arc;
-use std::time::Duration;
 use std::{fs, path::PathBuf};
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::time::sleep;
 use tokio_rustls::rustls::{self, OwnedTrustAnchor};
 use tokio_rustls::TlsConnector;
-
-const HTTP_REQ_STREAM_ID: u64 = 4;
 
 pub enum SuccessEvent {
     SendSuccess,

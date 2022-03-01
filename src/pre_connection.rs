@@ -1,11 +1,9 @@
-use crate::connection;
 use crate::connection::Connection;
 use crate::connection::*;
 use crate::endpoint;
 use crate::endpoint::LocalEndpoint;
 use crate::endpoint::RemoteEndpoint;
 use crate::error::TransportServicesError;
-use crate::framer::Framer;
 use crate::listener::*;
 use crate::transport_properties;
 use crate::transport_properties::Preference::*;
@@ -17,8 +15,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::net::TcpStream;
-use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;

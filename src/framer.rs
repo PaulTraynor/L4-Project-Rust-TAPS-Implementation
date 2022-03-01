@@ -1,6 +1,4 @@
-//use http_muncher::{Parser, ParserHandler};
 use httparse;
-use httparse::Header;
 use std::str;
 
 pub enum FramerError {
