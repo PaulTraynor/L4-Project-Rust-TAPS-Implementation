@@ -466,7 +466,6 @@ impl PreConnection {
         candidate_connections: Vec<CandidateConnection>,
     ) -> Result<(Option<Box<dyn Connection>>, Option<Box<dyn Listener>>), TransportServicesError>
     {
-        println!("{}", candidate_connections.len());
         let tcp_map = Arc::new(Mutex::new(HashMap::new()));
         let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
         let quic_map = Arc::new(Mutex::new(HashMap::new()));
@@ -487,24 +486,20 @@ impl PreConnection {
                 let found = found.clone();
                 match candidate {
                     CandidateConnection::Tcp(data) => {
-                        println!("here");
                         let conn_dict = tcp_map.clone();
                         tokio::spawn(async move {
-                            println!("run tcp");
                             run_connection_tcp(data, conn_dict, found).await;
                         });
                     }
                     CandidateConnection::TlsTcp(data) => {
                         let conn_dict = tls_tcp_map.clone();
                         tokio::spawn(async move {
-                            println!("run tls tcp");
                             run_connection_tls_tcp(data, conn_dict, found).await;
                         });
                     }
                     CandidateConnection::Quic(data) => {
                         let conn_dict = quic_map.clone();
                         tokio::spawn(async move {
-                            println!("run quic");
                             run_connection_quic(data, conn_dict, found).await;
                         });
                     }
@@ -637,7 +632,7 @@ async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnF
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            println!("{} won", conn.addr);
+            println!("Connected to {} over TCP", conn.addr);
             map.insert("conn".to_string(), tcp_conn);
             *found = true;
         }
@@ -651,7 +646,7 @@ async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, fo
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            println!("tls won");
+            println!("Connected to {} over TLS/TCP", conn.addr);
             map.insert("conn".to_string(), tls_tcp_conn);
             *found = true;
         }
@@ -665,7 +660,7 @@ async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: Co
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
-            println!("quic won: {}", conn.addr);
+            println!("Connected to {} over QUIC", conn.addr);
             map.insert("conn".to_string(), quic_conn);
             *found = true;
         }
@@ -684,6 +679,7 @@ async fn run_listener_tcp(
             let tcp_listener = TapsTcpListener {
                 listener: tcp_listener,
             };
+            println!("TCP listener listening on {}", listener.addr);
             map.insert("listener".to_string(), tcp_listener);
             *found = true;
         }
@@ -701,8 +697,8 @@ async fn run_listener_tls_tcp(
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
+            println!("TLS/TCP listener listening on {}", listener.addr);
             map.insert("listener".to_string(), tls_tcp_listener);
-            println!("tls_tcp won");
             *found = true;
         }
     }
@@ -724,6 +720,7 @@ async fn run_listener_quic(
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
         if *found == false {
+            println!("QUIC listener listening on {}", listener.addr);
             map.insert("listener".to_string(), quic_listener);
             *found = true;
         }
