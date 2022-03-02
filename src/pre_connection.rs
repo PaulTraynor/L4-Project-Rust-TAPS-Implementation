@@ -57,6 +57,18 @@ impl PreConnection {
         match &self.remote_endpoint {
             Some(v) => match v {
                 RemoteEndpoint::HostnamePort(host, port) => {
+                    let dns_ips = if host == &"h2".to_string() || host == &"h3".to_string() {
+                        let mut ip_vec = Vec::new();
+                        ip_vec.push(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)));
+                        ip_vec.push(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 3)));
+                        ip_vec
+                    } else {
+                        match get_ips(&host) {
+                            Ok(v) => v,
+                            Err(e) => panic!("failed to lookup host"),
+                        }
+                    };
+
                     let mut dns_ips = match get_ips(&host) {
                         Ok(v) => v,
                         Err(e) => panic!("failed to lookup host"),
@@ -627,7 +639,6 @@ enum CallerType {
 }
 
 async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {
-    println!("trying {}", conn.addr);
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
@@ -640,8 +651,6 @@ async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnF
 }
 
 async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, found: ConnFound) {
-    println!("trying tls {}", conn.addr);
-    println!("trying tls {}", conn.host);
     if let Some(tls_tcp_conn) = TlsTcpConnection::connect(conn.addr, conn.host).await {
         let mut map = map.lock().unwrap();
         let mut found = found.lock().unwrap();
