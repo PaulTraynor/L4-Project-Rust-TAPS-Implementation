@@ -69,10 +69,6 @@ impl PreConnection {
                         }
                     };
 
-                    let mut dns_ips = match get_ips(&host) {
-                        Ok(v) => v,
-                        Err(e) => panic!("failed to lookup host"),
-                    };
                     //dns_ips.remove(0);
                     for candidate in candidates {
                         //ips.push(SocketAddr::new(ip, *port))
