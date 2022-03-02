@@ -57,7 +57,7 @@ impl PreConnection {
         match &self.remote_endpoint {
             Some(v) => match v {
                 RemoteEndpoint::HostnamePort(host, port) => {
-                    let dns_ips = if host == &"h2".to_string() || host == &"h3".to_string() {
+                    let dns_ips = if host == &"remote_host".to_string() {
                         let mut ip_vec = Vec::new();
                         ip_vec.push(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)));
                         ip_vec.push(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 3)));
