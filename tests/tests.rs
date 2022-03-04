@@ -64,7 +64,7 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 10)]
-async fn listen_test() -> Result<(), TransportServicesError> {
+async fn listener_test() -> Result<(), TransportServicesError> {
     let mut transport_properties = transport_properties::TransportProperties::default();
     transport_properties.selectionProperties.remove(5);
     transport_properties

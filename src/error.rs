@@ -6,4 +6,5 @@ pub enum TransportServicesError {
     NoConnectionSucceeded,
     ListenFailed,
     InitiateFailed,
+    FailedToReturnConnection,
 }

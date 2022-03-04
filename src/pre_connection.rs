@@ -397,10 +397,13 @@ impl PreConnection {
                             *protocols.get_mut("quic").unwrap() += 1;
                         }
                     }
+                    Ignore => {}
+                    Avoid => {
+                        *protocols.get_mut("quic").unwrap() -= 1;
+                    }
                     Prohibit => {
                         protocols.remove("quic");
                     }
-                    _ => {}
                 },
                 CongestionControl(pref) => match pref {
                     Prefer => {
@@ -451,7 +454,7 @@ impl PreConnection {
             };
         }
         if protocols.is_empty() {
-            panic!("No procols match selected preferences");
+            panic!("No protocols match selected preferences");
         }
         let mut final_protos: Vec<PreferenceLevel> = Vec::new();
         for (k, v) in protocols.iter() {

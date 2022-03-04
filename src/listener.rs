@@ -1,4 +1,5 @@
 use crate::connection::*;
+use crate::error::TransportServicesError;
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use log::*;
@@ -23,7 +24,7 @@ use tokio_stream::Stream;
 
 #[async_trait]
 pub trait Listener {
-    async fn next_connection(&mut self) -> Option<Box<dyn Connection>>;
+    async fn next_connection(&mut self) -> Result<Box<dyn Connection>, TransportServicesError>;
 }
 
 pub struct TapsTcpListener {
@@ -60,11 +61,11 @@ impl Stream for TapsTcpListener {
 
 #[async_trait]
 impl Listener for TapsTcpListener {
-    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+    async fn next_connection(&mut self) -> Result<Box<dyn Connection>, TransportServicesError> {
         if let Some(conn) = self.next().await {
-            Some(Box::new(conn))
+            Ok(Box::new(conn))
         } else {
-            None
+            Err(TransportServicesError::FailedToReturnConnection)
         }
     }
 }
@@ -178,11 +179,11 @@ impl Stream for QuicListener {
 
 #[async_trait]
 impl Listener for QuicListener {
-    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+    async fn next_connection(&mut self) -> Result<Box<dyn Connection>, TransportServicesError> {
         if let Some(conn) = self.next().await {
-            Some(Box::new(conn))
+            Ok(Box::new(conn))
         } else {
-            None
+            Err(TransportServicesError::FailedToReturnConnection)
         }
     }
 }
@@ -257,11 +258,11 @@ impl Stream for TlsTcpListener {
 
 #[async_trait]
 impl Listener for TlsTcpListener {
-    async fn next_connection(&mut self) -> Option<Box<dyn Connection>> {
+    async fn next_connection(&mut self) -> Result<Box<dyn Connection>, TransportServicesError> {
         if let Some(conn) = self.next().await {
-            Some(Box::new(conn))
+            Ok(Box::new(conn))
         } else {
-            None
+            Err(TransportServicesError::FailedToReturnConnection)
         }
     }
 }
