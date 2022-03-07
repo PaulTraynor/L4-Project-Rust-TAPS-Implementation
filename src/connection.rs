@@ -47,7 +47,7 @@ impl Connection for TcpConnection {
     }
 
     async fn recv(&mut self) -> Result<Message, TransportServicesError> {
-        let mut buffer: [u8; 500] = [0; 500];
+        let mut buffer: [u8; 40] = [0; 40];
         match self.stream.read(&mut buffer).await {
             Ok(num_bytes) => {
                 let mut vec: Vec<u8> = Vec::new();
