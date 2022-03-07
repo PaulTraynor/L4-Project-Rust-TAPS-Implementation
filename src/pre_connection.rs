@@ -551,12 +551,10 @@ impl PreConnection {
             if !tcp_map_clone.lock().unwrap().is_empty() {
                 let mut conn = tcp_map_clone.lock().unwrap();
                 let conn = conn.remove("conn").unwrap();
-                println!("returning");
                 return Ok((Some(Box::new(conn)), None));
             } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
                 let mut conn = tls_tcp_map_clone.lock().unwrap();
                 let conn = conn.remove("conn").unwrap();
-                println!("returning tls/tcp");
                 return Ok((Some(Box::new(conn)), None));
             } else if !quic_map_clone.lock().unwrap().is_empty() {
                 let mut conn = quic_map_clone.lock().unwrap();
@@ -564,7 +562,6 @@ impl PreConnection {
                 return Ok((Some(Box::new(conn)), None));
             } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
                 let mut listener = tcp_listener_map_clone.lock().unwrap();
-                println!("tcp listener won");
                 let listener = listener.remove("listener").unwrap();
                 return Ok((None, Some(Box::new(listener))));
             } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
@@ -573,7 +570,6 @@ impl PreConnection {
                 return Ok((None, Some(Box::new(listener))));
             } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
                 let mut listener = quic_listener_map_clone.lock().unwrap();
-                println!("quic listener won");
                 let listener = listener.remove("listener").unwrap();
                 return Ok((None, Some(Box::new(listener))));
             } else {
