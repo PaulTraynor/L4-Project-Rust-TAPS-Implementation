@@ -39,7 +39,6 @@ impl TcpConnection {
 #[async_trait]
 impl Connection for TcpConnection {
     async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError> {
-        self.stream.set_nodelay(true).unwrap();
         match self.stream.write(&message.content).await {
             Ok(num_bytes) => Ok(num_bytes),
             Err(_) => Err(TransportServicesError::SendFailed),
@@ -47,7 +46,7 @@ impl Connection for TcpConnection {
     }
 
     async fn recv(&mut self) -> Result<Message, TransportServicesError> {
-        let mut buffer: [u8; 20] = [0; 20];
+        let mut buffer: [u8; 500] = [0; 500];
         match self.stream.read(&mut buffer).await {
             Ok(num_bytes) => {
                 let mut vec: Vec<u8> = Vec::new();
