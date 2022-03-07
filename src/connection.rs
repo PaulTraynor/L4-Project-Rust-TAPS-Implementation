@@ -39,6 +39,7 @@ impl TcpConnection {
 #[async_trait]
 impl Connection for TcpConnection {
     async fn send(&mut self, message: Message) -> Result<usize, TransportServicesError> {
+        self.stream.set_nodelay(true).unwrap();
         match self.stream.write(&message.content).await {
             Ok(num_bytes) => Ok(num_bytes),
             Err(_) => Err(TransportServicesError::SendFailed),
