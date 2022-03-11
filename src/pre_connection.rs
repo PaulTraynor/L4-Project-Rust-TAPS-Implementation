@@ -609,13 +609,15 @@ enum CallerType {
 
 async fn run_connection_tcp(conn: TcpCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
-        channel.send(CompletedConnection::Tcp(tcp_conn));
+        channel.send(CompletedConnection::Tcp(tcp_conn)).await;
     }
 }
 
 async fn run_connection_tls_tcp(conn: TlsTcpCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tls_tcp_conn) = TlsTcpConnection::connect(conn.addr, conn.host).await {
-        channel.send(CompletedConnection::TlsTcp(tls_tcp_conn));
+        channel
+            .send(CompletedConnection::TlsTcp(tls_tcp_conn))
+            .await;
     }
 }
 
@@ -623,13 +625,15 @@ async fn run_connection_quic(conn: QuicCandidate, channel: Sender<CompletedConne
     if let Some(quic_conn) =
         QuicConnection::connect(conn.addr, conn.local_endpoint, conn.cert_path, conn.host).await
     {
-        channel.send(CompletedConnection::Quic(quic_conn));
+        channel.send(CompletedConnection::Quic(quic_conn)).await;
     }
 }
 
 async fn run_listener_tcp(listener: TcpListenerCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tcp_listener) = TapsTcpListener::listener(listener.addr).await {
-        channel.send(CompletedConnection::TcpListener(tcp_listener));
+        channel
+            .send(CompletedConnection::TcpListener(tcp_listener))
+            .await;
     }
 }
 
@@ -640,7 +644,9 @@ async fn run_listener_tls_tcp(
     if let Some(tls_tcp_listener) =
         TlsTcpListener::listener(listener.addr, listener.cert_path, listener.key_path).await
     {
-        channel.send(CompletedConnection::TlsTcpListener(tls_tcp_listener));
+        channel
+            .send(CompletedConnection::TlsTcpListener(tls_tcp_listener))
+            .await;
     }
 }
 
@@ -653,7 +659,9 @@ async fn run_listener_quic(listener: QuicListenerCandidate, channel: Sender<Comp
     )
     .await
     {
-        channel.send(CompletedConnection::QuicListener(quic_listener));
+        channel
+            .send(CompletedConnection::QuicListener(quic_listener))
+            .await;
     }
 }
 
