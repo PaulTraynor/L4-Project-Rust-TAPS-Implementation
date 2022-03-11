@@ -32,9 +32,9 @@ pub struct TapsTcpListener {
 }
 
 impl TapsTcpListener {
-    pub async fn listener(addr: SocketAddr) -> Option<TcpListener> {
+    pub async fn listener(addr: SocketAddr) -> Option<TapsTcpListener> {
         match TcpListener::bind(addr).await {
-            Ok(listener) => Some(listener),
+            Ok(listener) => Some(TapsTcpListener { listener: listener }),
             Err(_) => None,
         }
     }
@@ -91,7 +91,6 @@ impl QuicListener {
                 let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
                 let key = cert.serialize_private_key_der();
                 let cert = cert.serialize_der().unwrap();
-                //fs::create_dir_all(&path).context("failed to create certificate directory")?;
                 fs::write(&cert_path, &cert).unwrap();
                 fs::write(&key_path, &key).unwrap();
                 (cert, key)

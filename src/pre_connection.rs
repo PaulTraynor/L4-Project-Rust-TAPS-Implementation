@@ -15,15 +15,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::sleep;
-
-type TcpConnRecord = Arc<Mutex<HashMap<String, TcpConnection>>>;
-type TlsTcpConnRecord = Arc<Mutex<HashMap<String, TlsTcpConnection>>>;
-type QuicConnRecord = Arc<Mutex<HashMap<String, QuicConnection>>>;
-type TcpListenerRecord = Arc<Mutex<HashMap<String, TapsTcpListener>>>;
-type TlsTcpListenerRecord = Arc<Mutex<HashMap<String, TlsTcpListener>>>;
-type QuicListenerRecord = Arc<Mutex<HashMap<String, QuicListener>>>;
-type ConnFound = Arc<Mutex<bool>>;
 
 pub struct PreConnection {
     pub local_endpoint: Option<endpoint::LocalEndpoint>,
@@ -477,108 +470,89 @@ impl PreConnection {
         candidate_connections: Vec<CandidateConnection>,
     ) -> Result<(Option<Box<dyn Connection>>, Option<Box<dyn Listener>>), TransportServicesError>
     {
-        let tcp_map = Arc::new(Mutex::new(HashMap::new()));
-        let tls_tcp_map = Arc::new(Mutex::new(HashMap::new()));
-        let quic_map = Arc::new(Mutex::new(HashMap::new()));
-        let tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
-        let tls_tcp_listener_map = Arc::new(Mutex::new(HashMap::new()));
-        let quic_listener_map = Arc::new(Mutex::new(HashMap::new()));
-        let tcp_map_clone = tcp_map.clone();
-        let tls_tcp_map_clone = tls_tcp_map.clone();
-        let quic_map_clone = quic_map.clone();
-        let tcp_listener_map_clone = tcp_listener_map.clone();
-        let tls_tcp_listener_map_clone = tls_tcp_listener_map.clone();
-        let quic_listener_map_clone = quic_listener_map.clone();
-        let found = false;
-        let found = Arc::new(Mutex::new(found));
-        let other_found = found.clone();
+        let (tx, mut rx) = mpsc::channel::<CompletedConnection>(64);
         tokio::spawn(async move {
             for candidate in candidate_connections {
-                let found = found.clone();
                 match candidate {
                     CandidateConnection::Tcp(data) => {
-                        let conn_dict = tcp_map.clone();
+                        let tcp_channel = tx.clone();
                         tokio::spawn(async move {
-                            run_connection_tcp(data, conn_dict, found).await;
+                            run_connection_tcp(data, tcp_channel).await;
                         });
                     }
                     CandidateConnection::TlsTcp(data) => {
-                        let conn_dict = tls_tcp_map.clone();
+                        let tls_channel = tx.clone();
                         tokio::spawn(async move {
-                            run_connection_tls_tcp(data, conn_dict, found).await;
+                            run_connection_tls_tcp(data, tls_channel).await;
                         });
                     }
                     CandidateConnection::Quic(data) => {
-                        let conn_dict = quic_map.clone();
+                        let quic_channel = tx.clone();
                         tokio::spawn(async move {
-                            run_connection_quic(data, conn_dict, found).await;
+                            run_connection_quic(data, quic_channel).await;
                         });
                     }
                     CandidateConnection::TcpListener(data) => {
-                        let conn_dict = tcp_listener_map.clone();
+                        let tcp_listener_channel = tx.clone();
                         tokio::spawn(async move {
-                            run_listener_tcp(data, conn_dict, found).await;
+                            run_listener_tcp(data, tcp_listener_channel).await;
                         });
                     }
                     CandidateConnection::TlsTcpListener(data) => {
-                        let conn_dict = tls_tcp_listener_map.clone();
+                        let tls_listener_channel = tx.clone();
                         tokio::spawn(async move {
-                            run_listener_tls_tcp(data, conn_dict, found).await;
+                            run_listener_tls_tcp(data, tls_listener_channel).await;
                         });
                     }
                     CandidateConnection::QuicListener(data) => {
-                        let conn_dict = quic_listener_map.clone();
+                        let quic_listener = tx.clone();
                         tokio::spawn(async move {
-                            run_listener_quic(data, conn_dict, found).await;
+                            run_listener_quic(data, quic_listener).await;
                         });
                     }
                 }
                 sleep(Duration::from_millis(30)).await;
             }
         });
-        if tokio::spawn(async move {
-            loop {
-                let other_found = other_found.lock().unwrap();
-                if *other_found {
-                    return true;
+        while let Some(conn) = rx.recv().await {
+            match conn {
+                CompletedConnection::Tcp(conn) => {
+                    println!("Connected over TCP");
+                    return Ok((Some(Box::new(conn)), None));
+                }
+                CompletedConnection::TlsTcp(conn) => {
+                    println!("Connected over TLS TCP");
+                    return Ok((Some(Box::new(conn)), None));
+                }
+                CompletedConnection::Quic(conn) => {
+                    println!("Connected over QUIC");
+                    return Ok((Some(Box::new(conn)), None));
+                }
+                CompletedConnection::TcpListener(conn) => {
+                    println!("Listening over TCP");
+                    return Ok((None, Some(Box::new(conn))));
+                }
+                CompletedConnection::TlsTcpListener(conn) => {
+                    println!("Listening over TLS TCP");
+                    return Ok((None, Some(Box::new(conn))));
+                }
+                CompletedConnection::QuicListener(conn) => {
+                    println!("Listening over QUIC");
+                    return Ok((None, Some(Box::new(conn))));
                 }
             }
-        })
-        .await
-        .unwrap()
-            == true
-        {
-            if !tcp_map_clone.lock().unwrap().is_empty() {
-                let mut conn = tcp_map_clone.lock().unwrap();
-                let conn = conn.remove("conn").unwrap();
-                return Ok((Some(Box::new(conn)), None));
-            } else if !tls_tcp_map_clone.lock().unwrap().is_empty() {
-                let mut conn = tls_tcp_map_clone.lock().unwrap();
-                let conn = conn.remove("conn").unwrap();
-                return Ok((Some(Box::new(conn)), None));
-            } else if !quic_map_clone.lock().unwrap().is_empty() {
-                let mut conn = quic_map_clone.lock().unwrap();
-                let conn = conn.remove("conn").unwrap();
-                return Ok((Some(Box::new(conn)), None));
-            } else if !tcp_listener_map_clone.lock().unwrap().is_empty() {
-                let mut listener = tcp_listener_map_clone.lock().unwrap();
-                let listener = listener.remove("listener").unwrap();
-                return Ok((None, Some(Box::new(listener))));
-            } else if !tls_tcp_listener_map_clone.lock().unwrap().is_empty() {
-                let mut listener = tls_tcp_listener_map_clone.lock().unwrap();
-                let listener = listener.remove("listener").unwrap();
-                return Ok((None, Some(Box::new(listener))));
-            } else if !quic_listener_map_clone.lock().unwrap().is_empty() {
-                let mut listener = quic_listener_map_clone.lock().unwrap();
-                let listener = listener.remove("listener").unwrap();
-                return Ok((None, Some(Box::new(listener))));
-            } else {
-                return Err(TransportServicesError::NoConnectionSucceeded);
-            }
-        } else {
-            return Err(TransportServicesError::NoConnectionSucceeded);
         }
+        return Err(TransportServicesError::NoConnectionSucceeded);
     }
+}
+
+enum CompletedConnection {
+    Tcp(TcpConnection),
+    TlsTcp(TlsTcpConnection),
+    Quic(QuicConnection),
+    TcpListener(TapsTcpListener),
+    TlsTcpListener(TlsTcpListener),
+    QuicListener(QuicListener),
 }
 
 struct PreferenceLevel {
@@ -633,86 +607,44 @@ enum CallerType {
     Server,
 }
 
-async fn run_connection_tcp(conn: TcpCandidate, map: TcpConnRecord, found: ConnFound) {
+async fn run_connection_tcp(conn: TcpCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tcp_conn) = TcpConnection::connect(conn.addr).await {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            println!("Connected to {} over TCP", conn.addr);
-            map.insert("conn".to_string(), tcp_conn);
-            *found = true;
-        }
+        channel.send(CompletedConnection::Tcp(tcp_conn));
     }
 }
 
-async fn run_connection_tls_tcp(conn: TlsTcpCandidate, map: TlsTcpConnRecord, found: ConnFound) {
+async fn run_connection_tls_tcp(conn: TlsTcpCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tls_tcp_conn) = TlsTcpConnection::connect(conn.addr, conn.host).await {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            println!("Connected to {} over TLS/TCP", conn.addr);
-            map.insert("conn".to_string(), tls_tcp_conn);
-            *found = true;
-        }
+        channel.send(CompletedConnection::TlsTcp(tls_tcp_conn));
     }
 }
 
-async fn run_connection_quic(conn: QuicCandidate, map: QuicConnRecord, found: ConnFound) {
+async fn run_connection_quic(conn: QuicCandidate, channel: Sender<CompletedConnection>) {
     if let Some(quic_conn) =
         QuicConnection::connect(conn.addr, conn.local_endpoint, conn.cert_path, conn.host).await
     {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            println!("Connected to {} over QUIC", conn.addr);
-            map.insert("conn".to_string(), quic_conn);
-            *found = true;
-        }
+        channel.send(CompletedConnection::Quic(quic_conn));
     }
 }
 
-async fn run_listener_tcp(
-    listener: TcpListenerCandidate,
-    map: TcpListenerRecord,
-    found: ConnFound,
-) {
+async fn run_listener_tcp(listener: TcpListenerCandidate, channel: Sender<CompletedConnection>) {
     if let Some(tcp_listener) = TapsTcpListener::listener(listener.addr).await {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            let tcp_listener = TapsTcpListener {
-                listener: tcp_listener,
-            };
-            println!("TCP listener listening on {}", listener.addr);
-            map.insert("listener".to_string(), tcp_listener);
-            *found = true;
-        }
+        channel.send(CompletedConnection::TcpListener(tcp_listener));
     }
 }
 
 async fn run_listener_tls_tcp(
     listener: TlsTcpListenerCandidate,
-    map: TlsTcpListenerRecord,
-    found: ConnFound,
+    channel: Sender<CompletedConnection>,
 ) {
     if let Some(tls_tcp_listener) =
         TlsTcpListener::listener(listener.addr, listener.cert_path, listener.key_path).await
     {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            println!("TLS/TCP listener listening on {}", listener.addr);
-            map.insert("listener".to_string(), tls_tcp_listener);
-            *found = true;
-        }
+        channel.send(CompletedConnection::TlsTcpListener(tls_tcp_listener));
     }
 }
 
-async fn run_listener_quic(
-    listener: QuicListenerCandidate,
-    map: QuicListenerRecord,
-    found: ConnFound,
-) {
+async fn run_listener_quic(listener: QuicListenerCandidate, channel: Sender<CompletedConnection>) {
     if let Some(quic_listener) = QuicListener::listener(
         listener.addr,
         listener.cert_path,
@@ -721,20 +653,10 @@ async fn run_listener_quic(
     )
     .await
     {
-        let mut map = map.lock().unwrap();
-        let mut found = found.lock().unwrap();
-        if *found == false {
-            println!("QUIC listener listening on {}", listener.addr);
-            map.insert("listener".to_string(), quic_listener);
-            *found = true;
-        }
+        channel.send(CompletedConnection::QuicListener(quic_listener));
     }
 }
 
 pub fn get_ips(hostname: &str) -> io::Result<Vec<IpAddr>> {
-    //let ips: Vec<std::net::IpAddr> =
     lookup_host(hostname)
-    //for ip in ips {
-    //  println!("{}", ip);
-    //}
 }
