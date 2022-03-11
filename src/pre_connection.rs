@@ -79,7 +79,6 @@ impl PreConnection {
                                     host: host.to_string(),
                                 });
                                 candidate_connections.push(tls_candidate);
-                                println!("added tls candidate: {}, {}, {}", ip, port, host);
                             }
                             if candidate == "quic".to_string() {
                                 let quic_port = if *port == 80 { 443 } else { *port };
