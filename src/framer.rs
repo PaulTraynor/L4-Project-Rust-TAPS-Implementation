@@ -7,10 +7,10 @@ pub enum FramerError {
 }
 
 pub trait Framer {
-    type Message;
-
-    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self::Message, FramerError>;
-    fn to_bytes(&self, message: Self::Message) -> Vec<u8>;
+    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self, FramerError>
+    where
+        Self: Sized;
+    fn to_bytes(&self) -> Vec<u8>;
 }
 
 pub struct HttpHeader {
@@ -32,15 +32,13 @@ pub struct HttpResponse {
     reason: String,
 }
 
-pub struct HttpRequestFramer {}
-pub struct HttpResponseFramer {}
-
 //impl ParserHandler for HttpRequestFramer {}
 
-impl Framer for HttpRequestFramer {
-    type Message = HttpRequest;
-
-    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self::Message, FramerError> {
+impl Framer for HttpRequest {
+    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self, FramerError>
+    where
+        Self: Sized,
+    {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
 
@@ -79,14 +77,14 @@ impl Framer for HttpRequestFramer {
         }
     }
 
-    fn to_bytes(&self, message: Self::Message) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::new();
-        bytes.extend_from_slice(message.method.as_bytes());
-        bytes.extend_from_slice(message.path.as_bytes());
+        bytes.extend_from_slice(self.method.as_bytes());
+        bytes.extend_from_slice(self.path.as_bytes());
         bytes.extend_from_slice(b" HTTP/");
-        bytes.extend_from_slice(message.version.to_string().as_bytes());
+        bytes.extend_from_slice(self.version.to_string().as_bytes());
         bytes.extend_from_slice(b"\r\n");
-        for header in message.headers {
+        for header in &self.headers {
             bytes.extend_from_slice(header.name.as_bytes());
             bytes.extend_from_slice(b" ");
             bytes.extend_from_slice(header.value.as_bytes());
@@ -97,10 +95,11 @@ impl Framer for HttpRequestFramer {
     }
 }
 
-impl Framer for HttpResponseFramer {
-    type Message = HttpResponse;
-
-    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self::Message, FramerError> {
+impl Framer for HttpResponse {
+    fn from_bytes(&self, raw_bytes: &[u8]) -> Result<Self, FramerError>
+    where
+        Self: Sized,
+    {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut response = httparse::Response::new(&mut headers);
 
@@ -141,17 +140,17 @@ impl Framer for HttpResponseFramer {
         }
     }
 
-    fn to_bytes(&self, message: Self::Message) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::new();
         bytes.extend_from_slice(b"HTTP");
         bytes.extend_from_slice(b"\\");
-        bytes.extend_from_slice(message.version.to_string().as_bytes());
+        bytes.extend_from_slice(self.version.to_string().as_bytes());
         bytes.extend_from_slice(b" ");
-        bytes.extend_from_slice(message.code.to_string().as_bytes());
+        bytes.extend_from_slice(self.code.to_string().as_bytes());
         bytes.extend_from_slice(b" ");
-        bytes.extend_from_slice(message.reason.as_bytes());
+        bytes.extend_from_slice(self.reason.as_bytes());
         bytes.extend_from_slice(b"\r\n");
-        for header in message.headers {
+        for header in &self.headers {
             bytes.extend_from_slice(header.name.as_bytes());
             bytes.extend_from_slice(b" ");
             bytes.extend_from_slice(header.value.as_bytes());

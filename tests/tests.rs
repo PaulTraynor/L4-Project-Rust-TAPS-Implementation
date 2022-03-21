@@ -2,8 +2,8 @@ use rust_taps_api::{
     connection::Connection,
     endpoint,
     error::TransportServicesError,
-    framer::{Framer, FramerError, HttpResponseFramer},
-    message::Message,
+    framer::{Framer, FramerError},
+    message::{HttpHeader, HttpRequest, HttpRequestMessage, Message},
     pre_connection, transport_properties,
     transport_properties::{Preference, SelectionProperty},
 };
@@ -32,29 +32,37 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
     let mut pre_conn =
         pre_connection::PreConnection::new(None, Some(remote_endpoint), transport_properties, None);
     let request = b"GET /index.html HTTP/1.1\r\nHost: www.google.com\r\n\r\n";
-    let resp_framer = HttpResponseFramer {};
+    let mut headers = Vec::new();
+    headers.push(HttpHeader {
+        name: "Host".to_string(),
+        value: "www.google.co.uk".to_string(),
+    });
+    let request = HttpRequest {
+        headers: headers,
+        method: "GET".to_string(),
+        path: "/index.html".to_string(),
+        version: 1,
+    };
+    let message = HttpRequestMessage { request: request };
     match pre_conn.initiate().await {
         Ok(mut conn) => {
-            match conn
-                .send(Message {
-                    content: request.to_vec(),
-                })
-                .await
-            {
+            match conn.send(Box::new(message)).await {
                 Ok(_) => {
-                    let data = conn.recv().await.unwrap();
-                    let resp = resp_framer.from_bytes(&data.content);
-                    match resp {
-                        Ok(_) => {
-                            println!("message received");
-                            Ok(())
-                        }
-                        Err(FramerError::Incomplete(s)) => {
-                            println!("Incomplete message: reading again");
-                            Err(TransportServicesError::RecvFailed)
-                        }
-                        Err(FramerError::ParseError(s)) => panic!("parse error"),
-                    }
+                    println!("ALL GOOD");
+                    return Ok(());
+                    //let data = conn.recv().await.unwrap();
+                    //let resp = resp_framer.from_bytes(&data.content);
+                    //match resp {
+                    //  Ok(_) => {
+                    //    println!("message received");
+                    //  Ok(())
+                    //}
+                    //Err(FramerError::Incomplete(s)) => {
+                    //  println!("Incomplete message: reading again");
+                    // Err(TransportServicesError::RecvFailed)
+                    //}
+                    //Err(FramerError::ParseError(s)) => panic!("parse error"),
+                    //}
                 }
                 Err(_) => Err(TransportServicesError::SendFailed),
             }
