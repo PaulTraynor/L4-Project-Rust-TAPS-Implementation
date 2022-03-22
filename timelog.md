@@ -320,4 +320,128 @@
 ### 01 Feb 2022
 
 * *1.5 hours* Increased robustness of TLS/TCP code by matching on more error prone parts of the code
-* *1 hour* Modified initiate and listen methods to return Result enums 
+* *1 hour* Modified initiate and listen methods to return Result enums
+
+### 02 Feb 2022
+
+* *0.5 hours* Meeting with supervisor
+
+### 05 Feb 2022
+
+* *2.5 hours* Started dissertation Design chapter
+
+### 06 Feb 2022
+
+* *3 hours* Finished 1st draft design chapter and added figures
+
+## Week 17
+
+### 07 Feb 2022
+
+* *2 hours* Started testing
+
+### 12 Feb 2022
+
+* *4 hours* Started modifying design chapter to include more discussion on decisions and trade-offs
+
+### 13 Feb 2022
+
+* *2 hours* Finished latest draft of design chapter
+
+## Week 18
+
+### 19 Feb 2022
+
+* *3 hours* Extended design chapter to include overview 
+
+### 20 Feb 2022
+
+* *2.5 hours* Completed first draft of background chapter
+
+## Week 19
+
+### 21 Feb 2022
+
+* *4 hours* Started introduction chapter
+
+### 26 Feb 2022
+
+* *4.5 hours* Changed Design/Implementation chapters to Implementation/Internals, wrote internals  
+
+### 27 Feb 2022
+
+* *2 hours* Further extended Internals chapter
+
+## Week 20
+
+### 28 Feb 2022 
+
+* *2.5 hours* Started Evaluation chapter
+
+### 01 Mar 2022
+
+* *1 hour* Transitioned to library crate
+
+### 02 Mar 2022
+
+* *5 hours* Mininet testing for Candidate Racing 
+
+### 03 Mar 2022
+
+* *3 hours* Extended Background chapter further
+* *1 hour* Added example API use section to API chapter
+
+### 04 Mar 2022
+
+* *2 hours* Code cleanup and Message extensions
+
+### 05 Mar 2022
+
+* *2.5 hours* Added comparison with sockets to Evaluation 
+
+### 06 Mar 2022
+
+* *1.5 hours* Started comparison with rs-TAPS in dissertation
+
+## Week 21
+
+### 07 Mar 2022 
+
+* *4 hours* Mininet testing for Framer errors
+
+### 08 Mar 2022
+
+* *1 hour* Extended Background further to discuss Apple Network.framework
+
+### 09 Mar 202
+
+* *1.5 hours* Added discussion of QUIC and HTTP/3 to API
+* *1 hour* Added discussion of security parameters to API chapter
+
+### 11 Mar 2022
+
+* *4.5 hours* Modified Candidate Racing to use message passing
+
+### 12 Mar 2022
+
+* *2 hours* First draft conclusion 
+
+### 13 Mar 2022
+
+* *3 hours* Reimplementation of Messages as traits pt1
+
+## Week 22
+
+### 14 Mar 2022
+
+* *3 hours* Reimplementation of Messages as traits pt2
+
+## Week 23
+
+### 21 Mar 2022
+
+* *3.5 hours* Experimenting with alternatives for Send and Sync traits on Message trait
+
+### 22 Mar 2022
+
+* *2.5 hours* Modified dissertation API, Evaluation and Conclusion chapters to include discussion on new implementation of Messages 
