@@ -6,7 +6,12 @@ use std::str;
 
 pub trait Message: Send + Sync {
     fn to_bytes(&self) -> Vec<u8>;
-    fn from_bytes(&mut self, raw_bytes: &[u8]);
+    fn from_bytes(&mut self, raw_bytes: &[u8]) -> Result<(), FramingError>;
+}
+
+pub enum FramingError {
+    Incomplete(String),
+    ParseError(String),
 }
 
 pub struct HttpHeader {
@@ -42,7 +47,7 @@ impl Message for HttpRequestMessage {
         bytes.extend_from_slice(b"\r\n");
         bytes
     }
-    fn from_bytes(&mut self, raw_bytes: &[u8]) {
+    fn from_bytes(&mut self, raw_bytes: &[u8]) -> Result<(), FramingError> {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
 
@@ -67,14 +72,17 @@ impl Message for HttpRequestMessage {
                     self.request.method = req.method.unwrap().to_string();
                     self.request.path = req.path.unwrap().to_string();
                     self.request.version = req.version.unwrap();
+                    Ok(())
                 } else {
-                    //return Err(FramerError::Incomplete(
-                    //  "Error: incomplete request".to_string(),
-                    //));
+                    return Err(FramingError::Incomplete(
+                        "Error: incomplete request".to_string(),
+                    ));
                 }
             }
             _ => {
-                //return Err(FramerError::ParseError("Error parsing request".to_string()));
+                return Err(FramingError::ParseError(
+                    "Error parsing request".to_string(),
+                ));
             }
         }
     }

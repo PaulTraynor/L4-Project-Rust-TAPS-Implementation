@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 pub struct TransportProperties {
     pub selectionProperties: Vec<SelectionProperty>,
-    connectionProperties: Vec<ConnectionProperty>,
+    pub connectionProperties: Vec<ConnectionProperty>,
 }
 
 impl TransportProperties {
@@ -42,7 +42,7 @@ pub enum SelectionProperty {
     Secure(Preference),
 }
 
-enum ConnectionProperty {}
+pub enum ConnectionProperty {}
 
 pub struct SecurityParameters {
     pub certificate_path: Option<PathBuf>,
