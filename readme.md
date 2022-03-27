@@ -22,10 +22,10 @@ The Rust compiler must be installed to use the API. Version 1.55 was used for th
 
 To build the API in your project, run: 
 
-cargo build.
+cargo build
 
 ### Test steps
 
 Run the unit tests, run: 
 
-cargo test.
+cargo test
