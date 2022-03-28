@@ -46,7 +46,7 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
     let message = HttpRequestMessage { request: request };
     match pre_conn.initiate().await {
         Ok(mut conn) => {
-            match conn.send(Box::new(message)).await {
+            match conn.send(&message).await {
                 Ok(_) => {
                     println!("ALL GOOD");
                     return Ok(());

@@ -18,11 +18,8 @@ pub enum SuccessEvent {
 
 #[async_trait]
 pub trait Connection {
-    async fn send(&mut self, message: Box<dyn Message>) -> Result<usize, TransportServicesError>;
-    async fn recv(
-        &mut self,
-        message: Box<dyn Message>,
-    ) -> Result<Box<dyn Message>, TransportServicesError>;
+    async fn send(&mut self, message: &dyn Message) -> Result<usize, TransportServicesError>;
+    async fn recv(&mut self, message: &mut dyn Message) -> Result<(), TransportServicesError>;
     async fn close(&mut self) -> Result<(), TransportServicesError>;
     async fn abort(&mut self) -> Result<(), TransportServicesError>;
 }
@@ -42,7 +39,7 @@ impl TcpConnection {
 
 #[async_trait]
 impl Connection for TcpConnection {
-    async fn send(&mut self, message: Box<dyn Message>) -> Result<usize, TransportServicesError> {
+    async fn send(&mut self, message: &dyn Message) -> Result<usize, TransportServicesError> {
         let msg = &message.to_bytes();
         match self.stream.write(&msg).await {
             Ok(num_bytes) => Ok(num_bytes),
@@ -50,17 +47,14 @@ impl Connection for TcpConnection {
         }
     }
 
-    async fn recv(
-        &mut self,
-        mut message: Box<dyn Message>,
-    ) -> Result<Box<dyn Message>, TransportServicesError> {
+    async fn recv(&mut self, message: &mut dyn Message) -> Result<(), TransportServicesError> {
         let mut buffer: [u8; 500] = [0; 500];
         match self.stream.read(&mut buffer).await {
             Ok(num_bytes) => {
                 let mut vec: Vec<u8> = Vec::new();
                 vec.extend_from_slice(&buffer);
                 message.from_bytes(&buffer);
-                Ok(message)
+                Ok(())
             }
             Err(_) => Err(TransportServicesError::RecvFailed),
         }
@@ -189,7 +183,7 @@ impl QuicConnection {
 }
 #[async_trait]
 impl Connection for QuicConnection {
-    async fn send(&mut self, message: Box<dyn Message>) -> Result<usize, TransportServicesError> {
+    async fn send(&mut self, message: &dyn Message) -> Result<usize, TransportServicesError> {
         match self.send.write(&message.to_bytes()).await {
             Ok(num_bytes) => {
                 self.send.finish().await;
@@ -199,17 +193,14 @@ impl Connection for QuicConnection {
         }
     }
 
-    async fn recv(
-        &mut self,
-        mut message: Box<dyn Message>,
-    ) -> Result<Box<dyn Message>, TransportServicesError> {
+    async fn recv(&mut self, mut message: &mut dyn Message) -> Result<(), TransportServicesError> {
         let mut buffer: [u8; 1024] = [0; 1024];
         match self.recv.read(&mut buffer).await {
             Ok(_) => {
                 let mut vec: Vec<u8> = Vec::new();
                 vec.extend_from_slice(&buffer);
                 message.from_bytes(&buffer);
-                Ok(message)
+                Ok(())
             }
             Err(_) => Err(TransportServicesError::RecvFailed),
         }
@@ -305,7 +296,7 @@ impl TlsTcpConnection {
 
 #[async_trait]
 impl Connection for TlsTcpConnection {
-    async fn send(&mut self, message: Box<dyn Message>) -> Result<usize, TransportServicesError> {
+    async fn send(&mut self, message: &dyn Message) -> Result<usize, TransportServicesError> {
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => match conn.write(&message.to_bytes()).await {
                 Ok(num_bytes) => Ok(num_bytes),
@@ -318,10 +309,7 @@ impl Connection for TlsTcpConnection {
         }
     }
 
-    async fn recv(
-        &mut self,
-        mut message: Box<dyn Message>,
-    ) -> Result<Box<dyn Message>, TransportServicesError> {
+    async fn recv(&mut self, message: &mut dyn Message) -> Result<(), TransportServicesError> {
         let mut buffer: [u8; 10000] = [0; 10000];
         match &mut self.tls_conn {
             TlsTcpConn::Client(conn) => match conn.read(&mut buffer).await {
@@ -329,7 +317,7 @@ impl Connection for TlsTcpConnection {
                     let mut vec: Vec<u8> = Vec::new();
                     vec.extend_from_slice(&buffer);
                     message.from_bytes(&buffer);
-                    Ok(message)
+                    Ok(())
                 }
                 Err(_) => Err(TransportServicesError::RecvFailed),
             },
@@ -338,7 +326,7 @@ impl Connection for TlsTcpConnection {
                     let mut vec: Vec<u8> = Vec::new();
                     vec.extend_from_slice(&buffer);
                     message.from_bytes(&buffer);
-                    Ok(message)
+                    Ok(())
                 }
                 Err(_) => Err(TransportServicesError::RecvFailed),
             },
