@@ -1,12 +1,12 @@
 # Rust TAPS Implementation
 
-Rust implementation of the |ETF's Transport Services (TAPS) API (https://datatracker.ietf.org/doc/draft-ietf-taps-arch/). 
+Rust implementation of the IETF's Transport Services (TAPS) API (https://datatracker.ietf.org/doc/draft-ietf-taps-arch/). 
 
 This implementation makes use of Tokio for asynchrony and supports the TCP, TLS TCP and QUIC transport protocols.
 
 ## Build instructions
 
-To incorporate the API into an existing project, add this as a dependency in cargo.toml:
+To incorporate the API into an existing project, add it as a dependency in cargo.toml:
 
 	taps = {git = "https://github.com/PaulTraynor/Rust-TAPS-Implementation", package = "rust-taps-api"}
 
