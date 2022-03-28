@@ -1,7 +1,7 @@
 use crate::error::TransportServicesError;
 use crate::message::Message;
 use async_trait::async_trait;
-use quinn;
+use quinn::{self, VarInt};
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -24,6 +24,7 @@ pub trait Connection {
         message: Box<dyn Message>,
     ) -> Result<Box<dyn Message>, TransportServicesError>;
     async fn close(&mut self) -> Result<(), TransportServicesError>;
+    async fn abort(&mut self) -> Result<(), TransportServicesError>;
 }
 
 pub struct TcpConnection {
@@ -71,9 +72,11 @@ impl Connection for TcpConnection {
             Ok(_) => Ok(()),
             Err(_) => Err(TransportServicesError::ShutdownFailed),
         }
-        //.expect("failed to shutdown");
     }
-    //fn add_framer(&mut self){}
+    async fn abort(&mut self) -> Result<(), TransportServicesError> {
+        drop(self);
+        Ok(())
+    }
 }
 
 pub const ALPN_QUIC_HTTP: &[&[u8]] = &[b"h3"];
@@ -219,6 +222,12 @@ impl Connection for QuicConnection {
         }
         //self.conn.close(0u32.into(), b"done");
     }
+
+    async fn abort(&mut self) -> Result<(), TransportServicesError> {
+        self.conn
+            .close(VarInt::from_u32(0), b"connection closed by application");
+        Ok(())
+    }
 }
 pub enum TlsTcpConn {
     Client(tokio_rustls::client::TlsStream<tokio::net::TcpStream>),
@@ -346,6 +355,19 @@ impl Connection for TlsTcpConnection {
                 Ok(_) => Ok(()),
                 Err(_) => Err(TransportServicesError::ShutdownFailed),
             },
+        }
+    }
+
+    async fn abort(&mut self) -> Result<(), TransportServicesError> {
+        match &mut self.tls_conn {
+            TlsTcpConn::Client(conn) => {
+                drop(conn);
+                Ok(())
+            }
+            TlsTcpConn::Server(conn) => {
+                drop(conn);
+                Ok(())
+            }
         }
     }
 }
