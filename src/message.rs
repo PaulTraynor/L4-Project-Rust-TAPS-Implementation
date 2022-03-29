@@ -101,7 +101,7 @@ impl Message for HttpRequest {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::new();
         bytes.extend_from_slice(self.method.as_bytes());
-        bytes.extend_from_slice(b": ");
+        bytes.extend_from_slice(b" ");
         bytes.extend_from_slice(self.path.as_bytes());
         bytes.extend_from_slice(b" HTTP/");
         bytes.extend_from_slice(self.version.to_string().as_bytes());
