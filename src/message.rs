@@ -63,10 +63,10 @@ impl HttpRequest {
 }
 
 pub struct HttpResponse {
-    headers: Vec<HttpHeader>,
-    version: u8,
-    code: u16,
-    reason: String,
+    pub headers: Vec<HttpHeader>,
+    pub version: u8,
+    pub code: u16,
+    pub reason: String,
 }
 
 impl HttpResponse {
