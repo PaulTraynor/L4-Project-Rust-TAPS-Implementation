@@ -23,6 +23,16 @@ impl HttpHeader {
             value: value,
         }
     }
+
+    pub fn new_single(name: String, value: String) -> Vec<HttpHeader> {
+        let header = HttpHeader {
+            name: name,
+            value: value,
+        };
+        let mut headers = Vec::new();
+        headers.push(header);
+        headers
+    }
 }
 
 pub struct HttpRequest {
@@ -41,6 +51,15 @@ impl HttpRequest {
             version: version,
         }
     }
+
+    pub fn new_empty() -> HttpRequest {
+        HttpRequest {
+            headers: Vec::new(),
+            method: "".to_string(),
+            path: "".to_string(),
+            version: 0,
+        }
+    }
 }
 
 pub struct HttpResponse {
@@ -57,6 +76,15 @@ impl HttpResponse {
             version: version,
             code: code,
             reason: reason,
+        }
+    }
+
+    pub fn new_empty() -> HttpResponse {
+        HttpResponse {
+            headers: Vec::new(),
+            version: 0,
+            code: 0,
+            reason: "".to_string(),
         }
     }
 }
