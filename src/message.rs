@@ -11,6 +11,7 @@ pub enum FramingError {
     ParseError(String),
 }
 
+#[derive(Debug)]
 pub struct HttpHeader {
     pub name: String,
     pub value: String,
