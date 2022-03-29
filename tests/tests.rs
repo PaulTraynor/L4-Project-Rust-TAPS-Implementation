@@ -2,7 +2,6 @@ use rust_taps_api::{
     connection::Connection,
     endpoint,
     error::TransportServicesError,
-    framer::{Framer, FramerError},
     message::{HttpHeader, HttpRequest, Message},
     pre_connection, transport_properties,
     transport_properties::{Preference, SelectionProperty},
