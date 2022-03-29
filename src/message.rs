@@ -159,7 +159,7 @@ impl Message for HttpResponse {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes: Vec<u8> = Vec::new();
         bytes.extend_from_slice(b"HTTP");
-        bytes.extend_from_slice(b"\\");
+        bytes.extend_from_slice(b"/");
         bytes.extend_from_slice(self.version.to_string().as_bytes());
         bytes.extend_from_slice(b" ");
         bytes.extend_from_slice(self.code.to_string().as_bytes());
@@ -168,7 +168,7 @@ impl Message for HttpResponse {
         bytes.extend_from_slice(b"\r\n");
         for header in &self.headers {
             bytes.extend_from_slice(header.name.as_bytes());
-            bytes.extend_from_slice(b" ");
+            bytes.extend_from_slice(b": ");
             bytes.extend_from_slice(header.value.as_bytes());
             bytes.extend_from_slice(b"\r\n");
         }
