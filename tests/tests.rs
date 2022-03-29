@@ -40,7 +40,7 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
         headers: headers,
         method: "GET".to_string(),
         path: "/index.html".to_string(),
-        version: 1,
+        version: 1.1,
     };
     match pre_conn.initiate().await {
         Ok(mut conn) => {

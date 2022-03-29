@@ -41,11 +41,16 @@ pub struct HttpRequest {
     pub headers: Vec<HttpHeader>,
     pub method: String,
     pub path: String,
-    pub version: u8,
+    pub version: f32,
 }
 
 impl HttpRequest {
-    pub fn new(headers: Vec<HttpHeader>, method: String, path: String, version: u8) -> HttpRequest {
+    pub fn new(
+        headers: Vec<HttpHeader>,
+        method: String,
+        path: String,
+        version: f32,
+    ) -> HttpRequest {
         HttpRequest {
             headers: headers,
             method: method,
@@ -59,7 +64,7 @@ impl HttpRequest {
             headers: Vec::new(),
             method: "".to_string(),
             path: "".to_string(),
-            version: 0,
+            version: 1.1,
         }
     }
 }
@@ -132,7 +137,7 @@ impl Message for HttpRequest {
                     self.headers = header_vec;
                     self.method = req.method.unwrap().to_string();
                     self.path = req.path.unwrap().to_string();
-                    self.version = req.version.unwrap();
+                    self.version = req.version.unwrap().into();
                     Ok(())
                 } else {
                     return Err(FramingError::Incomplete(
