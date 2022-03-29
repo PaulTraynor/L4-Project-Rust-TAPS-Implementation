@@ -36,6 +36,7 @@ impl HttpHeader {
     }
 }
 
+#[derive(Debug)]
 pub struct HttpRequest {
     pub headers: Vec<HttpHeader>,
     pub method: String,
@@ -63,6 +64,7 @@ impl HttpRequest {
     }
 }
 
+#[derive(Debug)]
 pub struct HttpResponse {
     pub headers: Vec<HttpHeader>,
     pub version: u8,
