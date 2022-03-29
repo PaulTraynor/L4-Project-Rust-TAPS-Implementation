@@ -3,7 +3,7 @@ use rust_taps_api::{
     endpoint,
     error::TransportServicesError,
     framer::{Framer, FramerError},
-    message::{HttpHeader, HttpRequest, HttpRequestMessage, Message},
+    message::{HttpHeader, HttpRequest, Message},
     pre_connection, transport_properties,
     transport_properties::{Preference, SelectionProperty},
 };
@@ -43,10 +43,9 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
         path: "/index.html".to_string(),
         version: 1,
     };
-    let message = HttpRequestMessage { request: request };
     match pre_conn.initiate().await {
         Ok(mut conn) => {
-            match conn.send(&message).await {
+            match conn.send(&request).await {
                 Ok(_) => {
                     println!("ALL GOOD");
                     return Ok(());
