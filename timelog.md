@@ -445,3 +445,36 @@
 ### 22 Mar 2022
 
 * *2.5 hours* Modified dissertation API, Evaluation and Conclusion chapters to include discussion on new implementation of Messages 
+
+### 26 Mar 2022
+
+* *2 hours* Improved Background chapter by adding more context
+* *1.5 hours* Extended conclusion by adding more reflection
+
+### 27 Mar 2022
+
+* *3 hours* General improvements to dissertation, grammar etc.
+* *1 hour* Added discussion on the use of Box<T> syntax
+
+## Week 24
+
+### 28 Mar 2022
+
+* *2.5 hours* Removed use of boxes for Messages
+* *0.5 hours* Modified dissertation to reflect the above change
+* *2 hours* Started presentation
+
+### 29 Mar 2022
+
+* *2 hours* General improvements to Messages- more convenient constructors for default types
+
+### 30 Mar 2022
+
+* *1.5 hours* Completed presentation slides
+* *1 hour* Modified Evaluation chapter to reflect the focus of the chapter, the usability comparisons with sockets and rs-TAPS
+* *1 hour* Replaced API diagram with an easier to read version
+
+### 31 Mar 2022
+
+* *2 hours* Recorded video presentation 
+* *3.5 hours* Checked whole dissertation for mistakes and made improvements where necessary
