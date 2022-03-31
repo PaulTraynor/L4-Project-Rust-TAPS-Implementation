@@ -2,7 +2,7 @@ use rust_taps_api::{
     connection::Connection,
     endpoint,
     error::TransportServicesError,
-    message::{HttpHeader, HttpRequest, Message},
+    message::{HttpHeader, HttpRequest, HttpResponse},
     pre_connection, transport_properties,
     transport_properties::{Preference, SelectionProperty},
 };
@@ -42,29 +42,17 @@ async fn send_recv_test() -> Result<(), TransportServicesError> {
         path: "/index.html".to_string(),
         version: 1.1,
     };
+
+    let mut response = HttpResponse::new_empty();
+
     match pre_conn.initiate().await {
-        Ok(mut conn) => {
-            match conn.send(&request).await {
-                Ok(_) => {
-                    println!("ALL GOOD");
-                    return Ok(());
-                    //let data = conn.recv().await.unwrap();
-                    //let resp = resp_framer.from_bytes(&data.content);
-                    //match resp {
-                    //  Ok(_) => {
-                    //    println!("message received");
-                    //  Ok(())
-                    //}
-                    //Err(FramerError::Incomplete(s)) => {
-                    //  println!("Incomplete message: reading again");
-                    // Err(TransportServicesError::RecvFailed)
-                    //}
-                    //Err(FramerError::ParseError(s)) => panic!("parse error"),
-                    //}
-                }
-                Err(_) => Err(TransportServicesError::SendFailed),
+        Ok(mut conn) => match conn.send(&request).await {
+            Ok(_) => {
+                let resp = conn.recv(&mut response).await.unwrap();
+                return Ok(());
             }
-        }
+            Err(_) => Err(TransportServicesError::SendFailed),
+        },
         Err(_) => Err(TransportServicesError::InitiateFailed),
     }
 }
